@@ -5,18 +5,25 @@ use kinode_process_lib::{Address, get_state, set_state};
 use std::collections::HashMap;
 use alloy_signer::{k256::ecdsa::SigningKey, Wallet, LocalWallet, Signer};
 
+
+// from UI to backend
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum WsPush {
+    SetNumber(U256),
     Increment,
+    Number,
+}
+
+// from backend to UI
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum WsUpdate {
+    Number(U256),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Action {
     EncryptWallet {private_key: Option<String>, password: String}, // if none, will use decrypted wallet key
     DecryptWallet(String),
-    SetNumber(U256),
-    Increment,
-    Number,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

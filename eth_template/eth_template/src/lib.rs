@@ -23,7 +23,7 @@ use counter_caller::CounterCaller;
 mod types;
 use std::collections::HashMap;
 use std::str::FromStr;
-use types::{Action, PrivateKey, SerializableWallet, State, WsPush};
+use types::{Action, PrivateKey, SerializableWallet, State, WsPush, WsUpdate};
 
 use crate::encryption::{decrypt_data, encrypt_data};
 
@@ -79,15 +79,6 @@ fn handle_http_request(
         http::HttpServerRequest::WebSocketOpen { channel_id, .. } => {
             println!("got web socket open");
             *ws_channel_id = Some(channel_id);
-            // send_ws_push(
-            //     ws_channel_id.unwrap_or(0),
-            //     WsMessageType::Text,
-            //     LazyLoadBlob {
-            //         mime: Some("application/json".to_string()),
-            //         bytes: serde_json::to_vec(&GameLobbyDiff::Init(state.lobby.clone()))?,
-            //     },
-            // );
-
             return Ok(());
         }
         http::HttpServerRequest::WebSocketClose { .. } => {
@@ -102,23 +93,35 @@ fn handle_http_request(
                 return Ok(());
             };
 
+            println!("got web socket push");
+            if let None = counter_caller {
+                println!("counter caller not instantied. please decrypt wallet first.");
+                return Ok(());
+            }
+            let counter_caller = counter_caller.as_ref().unwrap();
+
             let ws_push = serde_json::from_slice::<WsPush>(&blob.bytes)?;
             match ws_push {
-                // WsPush::ConfigurePoints {
-                //     team1_spawn,
-                //     team2_spawn,
-                //     goal_post,
-                // } => {
-                //     let diff = GameLobbyDiff::ConfigurePoints {
-                //         team1_spawn,
-                //         team2_spawn,
-                //         goal_post,
-                //     };
-                //     println!("diff: {:?}", diff);
-                //     let _ = state.lobby.apply_diff(&diff);
-                //     state.save();
-                //     let _ = state.update_clients(&diff);
-                // }
+                WsPush::SetNumber(number) => {
+                    let _ = counter_caller.set_number(number);
+                    println!("Setting number to: {}", number);
+                }
+                WsPush::Increment => {
+                    let _ = counter_caller.increment();
+                    println!("Incremented");
+                }
+                WsPush::Number => {
+                    let number = counter_caller.number()?;
+                    println!("Got number: {}", number);
+                    send_ws_push(
+                        channel_id,
+                        WsMessageType::Text,
+                        LazyLoadBlob {
+                            mime: Some("application/json".to_string()),
+                            bytes: serde_json::to_vec(&WsUpdate::Number(number))?,
+                        },
+                    );
+                }
                 _ => {}
             }
             return Ok(());
@@ -223,33 +226,6 @@ fn handle_terminal_message(
                 println!("to create wallet use EncryptWallet");
                 println!("no wallet for chainid {}", *CURRENT_CHAIN_ID);
             }
-        }
-        Action::SetNumber(number) => {
-            if let None = counter_caller {
-                println!("counter caller not instantied. please decrypt wallet first.");
-                return Ok(());
-            }
-            let counter_caller = counter_caller.as_ref().unwrap();
-            let _ = counter_caller.set_number(number);
-            println!("Setting number to: {}", number);
-        }
-        Action::Increment => {
-            if let None = counter_caller {
-                println!("counter caller not instantied. please decrypt wallet first.");
-                return Ok(());
-            }
-            let counter_caller = counter_caller.as_ref().unwrap();
-            let _ = counter_caller.increment();
-            println!("Incrementing");
-        }
-        Action::Number => {
-            if let None = counter_caller {
-                println!("counter caller not instantied. please decrypt wallet first.");
-                return Ok(());
-            }
-            let counter_caller = counter_caller.as_ref().unwrap();
-            let number = counter_caller.number()?;
-            println!("Getting number: {}", number);
         }
     }
     return Ok(());
