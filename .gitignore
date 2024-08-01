@@ -1,0 +1,11 @@
+*/target
+*/*/target
+*/wit
+*/*/wit
+*/*/wasi*
+*swp
+*wasm
+*/node_modules
+/.vscode/settings.json
+/eth_template/ui/node_modules
+
