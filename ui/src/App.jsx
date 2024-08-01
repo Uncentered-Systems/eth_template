@@ -1,122 +1,227 @@
 import React, { useEffect, useState } from "react";
-import { applyDiff } from "./shared";
-import "./App.css"; // use for styling the chat
-import {
-  MainContainer,
-  ChatContainer,
-  MessageList,
-  Message,
-  MessageInput,
-} from "@chatscope/chat-ui-kit-react";
-import Msg from "./components/Msg";
+import { applyDiff } from "./wsUpdate";
 
-function App({ws, ourNode, setOurNode, ourInTeam, setOurInTeam, lobby, setLobby, nodeInTeam}) {
+let ws;
+let signer = null;
+let provider;
 
-  document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("playerForm");
-  });
+const CURRENT_CHAIN_ID = import.meta.env.VITE_CURRENT_CHAIN_ID;
+let CONTRACT_ADDRESS;
 
+switch (CURRENT_CHAIN_ID) {
+  case "31337":
+    CONTRACT_ADDRESS = import.meta.env.VITE_ANVIL_CONTRACT_ADDRESS;
+    break;
+  case "11155111":
+    CONTRACT_ADDRESS = import.meta.env.VITE_SEPOLIA_CONTRACT_ADDRESS;
+    break;
+  case "1":
+    CONTRACT_ADDRESS = import.meta.env.VITE_MAINNET_CONTRACT_ADDRESS;
+    break;
+  case "10":
+    CONTRACT_ADDRESS = import.meta.env.VITE_OPTIMISM_CONTRACT_ADDRESS;
+    break;
+  default:
+    throw new Error(`Invalid CURRENT_CHAIN_ID`);
+}
+console.log("CONTRACT_ADDRESS", CONTRACT_ADDRESS);
+
+const InterfaceUI = () => {
+  const [ourNode, setOurNode] = useState(null);
+  const [number, setNumber] = useState(0);
+  const [userAccount, setUserAccount] = useState("");
+  const [chainId, setChainId] = useState();
+  const [contract, setContract] = useState(null);
+  const [ethWagered, setEthWagered] = useState(null);
+  const [teamRequested, setTeamRequested] = useState(null);
+
+
+  // allow button if eth wagered != 0
+  async function joinTeamRequest(team_name) {
+    const minecraft_id = document.getElementById("minecraftId").value;
+    const gamelord_id = document.getElementById("gamelordId").value;
+
+    const url = `/eth_template:eth_template:astronaut.os/join_team`;
+
+    const message = ourNode;
+    const sig = await signer.signMessage(message);
+
+    console.log(sig);
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          gamelord_id: gamelord_id,
+          minecraft_id: minecraft_id,
+          team_name: team_name,
+          eth_address: userAccount,
+          signature: sig,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.text();
+    } catch (error) {
+      console.error("Error adding player:", error);
+    }
+  }
+
+  async function register(team_name) {
+    const eth_amount = document.getElementById("ethAmount").value;
+
+    try {
+      const team_name_as_num = team_name === "Team1" ? 0 : 1;
+      console.log("TEAM NAME AS NUM", team_name_as_num);
+      console.log("ETH AMOUNT", eth_amount);
+      console.log("PARSED ETH AMOUNT", parseEther(eth_amount));
+      const tx = await contract.wager(team_name_as_num, {
+        value: parseEther(eth_amount),
+      });
+      console.log("TX", tx);
+      const receipt = await tx.wait();
+      // console.log("RECEIPT", receipt);
+      getPlayerInfo();
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  async function getPlayerInfo() {
+    const player_info = await contract.getPlayerInfo(userAccount);
+    setEthWagered(player_info[0]);
+    setTeamRequested(player_info[1] === 0n ? "Team1" : "Team2");
+  }
+
+  useEffect(() => {
+    try {
+      getPlayerInfo();
+    } catch (error) {}
+  }, [contract]);
+
+  useEffect(() => {
+    const loadEthers = async () => {
+      if (window.ethereum == null) {
+        console.log("MetaMask not installed; using read-only defaults");
+        provider = ethers.getDefaultProvider();
+      } else {
+        provider = new ethers.BrowserProvider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = await provider.getSigner();
+        // Get the provider's chain ID
+        let network = await provider.getNetwork();
+        // console.log("NETWORK", network.chainId);
+        setChainId(network.chainId.toString());
+        // console.log("Connected to chain ID:", network.chainId);
+        let address = await signer.getAddress();
+        setUserAccount(address);
+        // console.log("ADDRESS", address);
+        const gamelord_contract = new ethers.Contract(
+          CONTRACT_ADDRESS,
+          Gamelord.abi,
+          signer
+        );
+        setContract(gamelord_contract);
+        setEthWagered(null);
+        setTeamRequested(null);
+      }
+    };
+    loadEthers();
+  }, []);
+
+  
 
   const onSend = (message) => {
     // console.log("sending:", message);
     ws.send(JSON.stringify({ SendMessage: message }));
   };
 
+  useEffect(() => {
+    webSocket();
+  }, []);
+
+  const webSocket = () => {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    // jurij's dev setup
+    // 5173 - 8080
+    // 5174 - 8080
+    // 5175 - 8081
+    const host =
+      window.location.port === "5173" || window.location.port === "5174"
+        ? "localhost:8080"
+        : window.location.port === "5175"
+        ? "localhost:8081"
+        : window.location.host;
+
+    ws = new WebSocket(
+      `${protocol}//${host}/eth_template:eth_template:astronaut.os/`
+    );
+
+    ws.onopen = function (event) {
+      console.log("Connection opened on " + window.location.host + ":", event);
+    };
+    ws.onmessage = function (event) {
+      const data = JSON.parse(event.data);
+      // console.log("data", data);
+      applyDiff(data, setLobby);
+    };
+  };
+
   return (
-    <div>
-      <h2>McClient</h2>
-      <div style={{ textAlign: "left" }}>
-        <p>Game: {lobby.name}</p>
-        <p>Minecraft Server Address: {lobby.minecraft_server_address}</p>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <div>
-            <h4>Team 1</h4>
-            <ul>
-              {lobby.team1?.players?.length > 0 ? (
-                lobby.team1.players.map((player, index) => (
-                  <p key={index}>{player.kinode_id}</p>
-                ))
-              ) : (
-                <p>No players in Team 1</p>
-              )}
-            </ul>
-          </div>
-          <div>
-            <h4>Team 2</h4>
-            <ul>
-              {lobby.team2?.players?.length > 0 ? (
-                lobby.team2.players.map((player, index) => (
-                  <p key={index}>{player.kinode_id}</p>
-                ))
-              ) : (
-                <p>No players in Team 2</p>
-              )}
-            </ul>
-          </div>
-        </div>
+    <>
+      <form id="playerForm">
+        <input
+          type="text"
+          id="ethAmount"
+          placeholder="Amount to Wager (Ether). Min 0.0001"
+        />
+        <button type="button" onClick={() => register("Team1")}>
+          Join Team1
+        </button>
+        <button type="button" onClick={() => register("Team2")}>
+          Join Team2
+        </button>
+      </form>
+      <div>
+        <p>
+          ETH Wagered:{" "}
+          {ethWagered !== null
+            ? `${ethers.formatEther(ethWagered)} ETH`
+            : "Not set"}
+        </p>
+        <p>Team Requested: {teamRequested || "Not selected"}</p>
       </div>
-      <pre id="response-output"></pre>
-      <div
-        style={{
-          position: "relative",
-        }}
-      >
-        {ourInTeam === null ? (
-          <p>You are not in a team yet. Join a team to see messages.</p>
-        ) : (
-          <>
-            <p>{ourInTeam} Chat</p>
+      <hr />
+      {ethWagered && ethers.parseEther("0.0001") <= ethWagered && (
+        <>
+          <h3>Enter Gamelord NodeId and Minecraft ID</h3>
+          <form id="playerForm">
+            <input
+              type="text"
+              id="gamelordId"
+              placeholder="Enter Gamelord NodeId, e.g. gamelordd.os"
+            />
+            <input
+              type="text"
+              id="minecraftId"
+              placeholder="Enter Your Minecraft ID"
+            />
+          </form>
+          <button type="button" onClick={() => joinTeamRequest(teamRequested)}>
+            Join
+          </button>
+          <hr />
+        </>
+      )}
+      <div>Chain ID: {chainId}</div>
+      <div>Address: {userAccount}</div>
+    </>
+  );};
 
-            <MainContainer
-              style={{
-                width: "100%",
-                height: "50vh",
-                border: "1px solid #ccc",
-              }}
-            >
-              <ChatContainer>
-                <MessageList
-                  style={{
-                    height: "50vh",
-                    overflowY: "auto",
-                    display: "flex",
-                    flexDirection: "column-reverse",
-                    border: "1px solid #ccc",
-                  }}
-                >
-                  {nodeInTeam(ourNode, lobby) === "team1" ? (
-                    lobby.team1.messages.map((message, index) => (
-                      <Msg key={message.id} message={message} />
-                    ))
-                  ) : nodeInTeam(ourNode, lobby) === "team2" ? (
-                    lobby.team2.messages.map((message, index) => (
-                      <Msg key={message.id} message={message} />
-                    ))
-                  ) : (
-                    <Message
-                      model={{
-                        message:
-                          "You are not in a team yet. Join a team to see messages.",
-                        sentTime: "",
-                        sender: "System",
-                      }}
-                    />
-                  )}
-                </MessageList>
-                <MessageInput
-                  style={{ border: "1px solid #ccc" }}
-                  placeholder="Type message here"
-                  attachButton={false}
-                  sendButton={false}
-                  onSend={onSend}
-                />
-              </ChatContainer>
-            </MainContainer>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export default App;
+export default InterfaceUI;

@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import path from 'path';
 import dotenv from 'dotenv';
 
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 // BASE_URL is process_name:package_name:publisher_node.
 // It represents the URL where the UI will be served from.
@@ -11,7 +11,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 // import manifest from '../pkg/manifest.json'
 // import metadata from '../pkg/metadata.json'
 // const BASE_URL = `${manifest.process_name}:${manifest.package}:${metadata.publisher}`
-const BASE_URL = `/mcclient:mcclient:basilesex.os`;
+const BASE_URL = `/eth_template:eth_template:astronaut.os`;
 
 // This is the proxy URL, it must match the node you are developing against
 const PROXY_URL = (process.env.VITE_NODE_URL || 'http://127.0.0.1:8080').replace('localhost', '127.0.0.1');

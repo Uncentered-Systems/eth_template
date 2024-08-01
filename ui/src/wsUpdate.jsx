@@ -1,8 +1,4 @@
-// warning: edit this file in mcstructs, not mcclient or gamelord
-//
-// note: doesn't live update with `npm run dev`
-//
-// here goes logic for applying diffs to lobby/state
+// logic for receiving ws updates and applying diffs to state
 export function applyDiff(data, setLobby) {
   console.log("KEY", Object.keys(data)[0]);
   switch (Object.keys(data)[0]) {
