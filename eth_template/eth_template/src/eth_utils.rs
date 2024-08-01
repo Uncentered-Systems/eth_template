@@ -6,11 +6,9 @@ use alloy::{
     rpc::types::eth::TransactionRequest,
     signers::local::PrivateKeySigner,
 };
-use alloy_primitives::{Bytes, FixedBytes, I256, U256};
-use alloy_rlp::Encodable;
-use alloy_sol_types::{sol, SolCall, SolEvent, SolValue};
+use alloy_primitives::{FixedBytes, U256};
 use kinode_process_lib::{
-    eth::{Address as EthAddress, BlockId, BlockNumberOrTag, EthError, Filter, Log, Provider},
+    eth::{Address as EthAddress, EthError, Provider},
     println,
 };
 use std::str::FromStr;
@@ -35,7 +33,11 @@ impl Caller {
         })
     }
 
-    pub fn tx_req(&self, call: Vec<u8>, contract_address: &str) -> Result<alloy_primitives::Bytes, EthError> {
+    pub fn tx_req(
+        &self,
+        call: Vec<u8>,
+        contract_address: &str,
+    ) -> Result<alloy_primitives::Bytes, EthError> {
         let tx_req = TransactionRequest::default();
         let to = match EthAddress::from_str(contract_address) {
             Ok(to) => to,
@@ -57,7 +59,9 @@ impl Caller {
     ) -> anyhow::Result<FixedBytes<32>> {
         // get nonce
         let mut nonce = 0;
-        let tx_count = self.provider.get_transaction_count(self.signer.address(), None);
+        let tx_count = self
+            .provider
+            .get_transaction_count(self.signer.address(), None);
         if let Ok(tx_count) = tx_count {
             nonce = tx_count.to::<u64>();
         } else {

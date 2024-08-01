@@ -16,14 +16,14 @@ mod encryption;
 mod eth_utils;
 use eth_utils::Caller;
 mod counter_caller;
-use counter_caller::CounterCaller;
 use alloy::signers::{local::PrivateKeySigner, SignerSync};
 use alloy_primitives::{Signature, U256};
 use alloy_signer::{LocalWallet, Signer};
+use counter_caller::CounterCaller;
 mod types;
-use types::{WsPush, State, Action, PrivateKey, SerializableWallet};
 use std::collections::HashMap;
 use std::str::FromStr;
+use types::{Action, PrivateKey, SerializableWallet, State, WsPush};
 
 use crate::encryption::{decrypt_data, encrypt_data};
 
@@ -68,11 +68,11 @@ lazy_static! {
     };
 }
 
-
 fn handle_http_request(
     state: &mut State,
     ws_channel_id: &mut Option<u32>,
     message: &Message,
+    counter_caller: &mut Option<CounterCaller>,
 ) -> anyhow::Result<()> {
     let our_http_request = serde_json::from_slice::<http::HttpServerRequest>(message.body())?;
     match our_http_request {
@@ -220,9 +220,37 @@ fn handle_terminal_message(
                     Err(_) => println!("Decryption failed, try again."),
                 }
             } else {
+                println!("to create wallet use EncryptWallet");
                 println!("no wallet for chainid {}", *CURRENT_CHAIN_ID);
             }
-        } // _ => println!("Invalid message"),
+        }
+        Action::SetNumber(number) => {
+            if let None = counter_caller {
+                println!("counter caller not instantied. please decrypt wallet first.");
+                return Ok(());
+            }
+            let counter_caller = counter_caller.as_ref().unwrap();
+            let _ = counter_caller.set_number(number);
+            println!("Setting number to: {}", number);
+        }
+        Action::Increment => {
+            if let None = counter_caller {
+                println!("counter caller not instantied. please decrypt wallet first.");
+                return Ok(());
+            }
+            let counter_caller = counter_caller.as_ref().unwrap();
+            let _ = counter_caller.increment();
+            println!("Incrementing");
+        }
+        Action::Number => {
+            if let None = counter_caller {
+                println!("counter caller not instantied. please decrypt wallet first.");
+                return Ok(());
+            }
+            let counter_caller = counter_caller.as_ref().unwrap();
+            let number = counter_caller.number()?;
+            println!("Getting number: {}", number);
+        }
     }
     return Ok(());
 }
@@ -238,7 +266,7 @@ fn handle_message(
         message.source().process.to_string().as_str()
     {
         println!("HTTP request received.");
-        return handle_http_request(state, ws_channel_id, &message);
+        return handle_http_request(state, ws_channel_id, &message, counter_caller);
     }
     if message.is_local(&message.source()) {
         println!("Local message received from: {:?}", message.source());
@@ -255,22 +283,27 @@ fn handle_message(
 call_init!(init);
 fn init(our: Address) {
     println!("{our}: eth template started");
+
+    // UI INIT
     let mut ws_channel_id: Option<u32> = None;
     bind_ws_path("/", true, false).unwrap();
-
     let _ = http::serve_ui(&our, "ui", true, false, vec!["/"]);
-    // redundant? :
-    // http::serve_index_html(&our, "ui", true, false, vec!["/"]).unwrap();
 
-    let _ = Request::to(("our", "eth", "distro", "sys"))
-        .body(serde_json::to_vec(&EthConfigAction::AddProvider(ProviderConfig {
-            chain_id: *CURRENT_CHAIN_ID,
-            trusted: true,
-            provider: RPC_URL.clone(),
-        })).unwrap())
-        .send();
+    // STATE INIT
     let mut state = State::fetch().unwrap_or_else(|| State::new(&our));
 
+    // ETH INIT
+    // this doesnt work for now, need to manually add to eth providers
+    let _ = Request::to(("our", "eth", "distro", "sys"))
+        .body(
+            serde_json::to_vec(&EthConfigAction::AddProvider(ProviderConfig {
+                chain_id: *CURRENT_CHAIN_ID,
+                trusted: true,
+                provider: RPC_URL.clone(),
+            }))
+            .unwrap(),
+        )
+        .send();
     let mut counter_caller: Option<CounterCaller> = None;
     if let Some(PrivateKey::Decrypted(wallet)) = state.wallets.get(&CURRENT_CHAIN_ID) {
         counter_caller = Some(CounterCaller {

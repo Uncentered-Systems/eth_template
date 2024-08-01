@@ -1,4 +1,5 @@
 use crate::counter_caller::CounterCaller;
+use alloy_primitives::U256;
 use serde::{Serialize, Deserialize};
 use kinode_process_lib::{Address, get_state, set_state};
 use std::collections::HashMap;
@@ -13,6 +14,9 @@ pub enum WsPush {
 pub enum Action {
     EncryptWallet {private_key: Option<String>, password: String}, // if none, will use decrypted wallet key
     DecryptWallet(String),
+    SetNumber(U256),
+    Increment,
+    Number,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
