@@ -6,7 +6,7 @@ import { MetaMaskUIProvider } from "@metamask/sdk-react-ui";
 
 const process_name = "eth_template:eth_template:astronaut.os";
 const CURRENT_CHAIN_ID = import.meta.env.VITE_CURRENT_CHAIN_ID;
-let CONTRACT_ADDRESS;
+export let CONTRACT_ADDRESS;
 
 switch (CURRENT_CHAIN_ID) {
   case "31337":
@@ -28,7 +28,7 @@ switch (CURRENT_CHAIN_ID) {
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    {/* <MetaMaskUIProvider
+    <MetaMaskUIProvider
       sdkOptions={{
         dappMetadata: {
           name: "eth_template App",
@@ -37,8 +37,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         infuraAPIKey: "ce8167f5e4864cfd9f70e36c088bab16",
         // Other options.
       }}
-    > */}
+    >
       <App />
-    {/* </MetaMaskUIProvider> */}
+    </MetaMaskUIProvider>
   </React.StrictMode>
 );
