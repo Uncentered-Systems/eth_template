@@ -8,10 +8,10 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 // BASE_URL is process_name:package_name:publisher_node.
 // It represents the URL where the UI will be served from.
 // If your node is running on localhost, you will access the UI at http://localhost:3000/process_name:package_name:publisher_node.
-// import manifest from '../pkg/manifest.json'
-// import metadata from '../pkg/metadata.json'
-// const BASE_URL = `${manifest.process_name}:${manifest.package}:${metadata.publisher}`
-const BASE_URL = `/eth_template:eth_template:astronaut.os`;
+import manifest from '../pkg/manifest.json'
+import metadata from '../metadata.json'
+// `/eth_template:eth_template:astronaut.os`;
+const BASE_URL = `${manifest[0].process_name}:${metadata.properties.package_name}:${metadata.properties.publisher}`
 
 // This is the proxy URL, it must match the node you are developing against
 const PROXY_URL = (process.env.VITE_NODE_URL || 'http://127.0.0.1:8080').replace('localhost', '127.0.0.1');

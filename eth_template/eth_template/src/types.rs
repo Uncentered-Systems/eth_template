@@ -3,7 +3,7 @@ use alloy_primitives::U256;
 use serde::{Serialize, Deserialize};
 use kinode_process_lib::{Address, get_state, set_state};
 use std::collections::HashMap;
-use alloy_signer::{k256::ecdsa::SigningKey, Wallet, LocalWallet, Signer};
+use alloy_signer::{k256::ecdsa::SigningKey, LocalWallet, Signer};
 
 
 // from UI to backend
@@ -29,32 +29,24 @@ pub enum Action {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PrivateKey {
     Encrypted(Vec<u8>),
-    Decrypted(SerializableWallet),
+    Decrypted(Wallet),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SerializableWallet {
+pub struct Wallet {
     pub address: String,
     pub private_key: String,
 }
 
-impl From<LocalWallet> for SerializableWallet {
+impl From<LocalWallet> for Wallet {
     fn from(wallet: LocalWallet) -> Self {
-        SerializableWallet {
+        Wallet {
             address: wallet.address().to_string(),
             private_key: hex::encode(wallet.to_bytes()),
         }
     }
 }
 
-impl SerializableWallet {
-    pub fn new() -> Self {
-        SerializableWallet {
-            address: "".to_string(),
-            private_key: "".to_string(),
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct State {

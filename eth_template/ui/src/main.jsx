@@ -4,7 +4,6 @@ import App from "./App";
 import "./index.css";
 import { MetaMaskUIProvider } from "@metamask/sdk-react-ui";
 
-const process_name = "eth_template:eth_template:astronaut.os";
 const CURRENT_CHAIN_ID = import.meta.env.VITE_CURRENT_CHAIN_ID;
 export let CONTRACT_ADDRESS;
 

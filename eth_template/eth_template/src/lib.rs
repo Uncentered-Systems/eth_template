@@ -23,7 +23,7 @@ use counter_caller::CounterCaller;
 mod types;
 use std::collections::HashMap;
 use std::str::FromStr;
-use types::{Action, PrivateKey, SerializableWallet, State, WsPush, WsUpdate};
+use types::{Action, PrivateKey, Wallet, State, WsPush, WsUpdate};
 
 use crate::encryption::{decrypt_data, encrypt_data};
 
@@ -199,15 +199,15 @@ fn handle_terminal_message(
                                 "Decrypted wallet with address: {:?}",
                                 parsed_wallet.address()
                             );
-                            let serializable_wallet = SerializableWallet::from(parsed_wallet);
+                            let wallet = Wallet::from(parsed_wallet);
                             state.wallets.insert(
                                 *CURRENT_CHAIN_ID,
-                                PrivateKey::Decrypted(serializable_wallet.clone()),
+                                PrivateKey::Decrypted(wallet.clone()),
                             );
                             state.save();
                             if let Some(caller) = Caller::new(
                                 *CURRENT_CHAIN_ID,
-                                serializable_wallet.private_key.as_str(),
+                                wallet.private_key.as_str(),
                             ) {
                                 *counter_caller = Some(CounterCaller {
                                     caller: caller,

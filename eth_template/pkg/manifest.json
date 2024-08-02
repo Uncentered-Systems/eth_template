@@ -2,7 +2,7 @@
     {
         "process_name": "eth_template",
         "process_wasm_path": "/eth_template.wasm",
-        "on_exit": "None",
+        "on_exit": "Restart",
         "request_networking": true,
         "request_capabilities": [
             "http_server:distro:sys",

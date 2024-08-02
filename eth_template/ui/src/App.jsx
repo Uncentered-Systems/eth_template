@@ -9,6 +9,7 @@ let ws;
 let signer = null;
 let provider;
 
+
 const App = () => {
   const [ourNode, setOurNode] = useState(null);
   const [number, setNumber] = useState(0);
@@ -46,21 +47,10 @@ const App = () => {
     const num = await contract.number();
     setNumber(num.toString());
   }
-  // async function meta
+
   useEffect(() => {
     webSocket();
   }, []);
-
-  // async function increment_from_metamask() {
-  //   try {
-  //     const tx = await contract.increment();
-  //     console.log("TX", tx);
-  //     const receipt = await tx.wait();
-  //     console.log("RECEIPT", receipt);
-  //   } catch (error) {
-  //     console.error(error);
-  //   }
-  // }
 
   // TODO - da se chainid user acc pojave cim se klikne na connect metamask
   async function load_metamask() {
