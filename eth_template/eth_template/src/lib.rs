@@ -229,6 +229,19 @@ fn handle_terminal_message(
                 println!("no wallet for chainid {}", *CURRENT_CHAIN_ID);
             }
         }
+        Action::ManyIncrements(num) => {
+            if let None = counter_caller {
+                println!("counter caller not instantied. please decrypt wallet first.");
+                return Ok(());
+            }
+            let counter_caller = counter_caller.as_ref().unwrap();
+            let result = counter_caller.increment()?;
+            let mut nonce = result.1;
+            for i in 0..num.try_into().unwrap() {
+                let result = counter_caller.increment_with_nonce(nonce+1)?;
+                nonce = result.1;
+            }
+        }
         Action::GetLogs => {
             if let None = counter_caller {
                 println!("counter caller not instantied. please decrypt wallet first.");

@@ -57,7 +57,7 @@ impl Caller {
         max_priority_fee_per_gas: u128,
         value: U256,
         chain_id: u64,
-    ) -> anyhow::Result<FixedBytes<32>> {
+    ) -> anyhow::Result<(FixedBytes<32>, u64)> {
         let to;
         if let Ok(address) = EthAddress::from_str(contract_address) {
             to = address;
@@ -84,7 +84,7 @@ impl Caller {
 
         let result = self.provider.send_raw_transaction(buf.into());
         match result {
-            Ok(tx_hash) => Ok(tx_hash),
+            Ok(tx_hash) => Ok((tx_hash, nonce)),
             Err(e) => Err(anyhow::anyhow!("Error sending transaction: {:?}", e)),
         }
     }
@@ -97,7 +97,7 @@ impl Caller {
         max_priority_fee_per_gas: u128,
         value: U256,
         chain_id: u64,
-    ) -> anyhow::Result<FixedBytes<32>> {
+    ) -> anyhow::Result<(FixedBytes<32>, u64)> {
         // get nonce
         println!("here1");
         let mut nonce = 0;
@@ -140,7 +140,7 @@ impl Caller {
 
         let result = self.provider.send_raw_transaction(buf.into());
         match result {
-            Ok(tx_hash) => Ok(tx_hash),
+            Ok(tx_hash) => Ok((tx_hash, nonce)),
             Err(e) => Err(anyhow::anyhow!("Error sending transaction: {:?}", e)),
         }
     }
