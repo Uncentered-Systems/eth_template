@@ -8,7 +8,7 @@ use alloy::{
 };
 use alloy_primitives::{FixedBytes, U256};
 use kinode_process_lib::{
-    eth::{Address as EthAddress, EthError, Provider},
+    eth::{Address as EthAddress, EthError, Filter, Log, Provider},
     println,
 };
 use std::str::FromStr;
@@ -47,8 +47,9 @@ impl Caller {
         self.provider.call(tx, None)
     }
 
-    pub fn send_tx(
+    pub fn send_tx_with_nonce(
         &self,
+        nonce: u64,
         call: Vec<u8>,
         contract_address: &str,
         gas_limit: u128,
@@ -56,20 +57,7 @@ impl Caller {
         max_priority_fee_per_gas: u128,
         value: U256,
         chain_id: u64,
-    ) -> anyhow::Result<FixedBytes<32>> {
-        // get nonce
-        let mut nonce = 0;
-        let tx_count = self
-            .provider
-            .get_transaction_count(self.signer.address(), None);
-        if let Ok(tx_count) = tx_count {
-            nonce = tx_count.to::<u64>();
-        } else {
-            println!("tx_count: {:?}", tx_count);
-            return Err(anyhow::anyhow!("Error getting transaction count"));
-        }
-
-        // get contract address
+    ) -> anyhow::Result<(FixedBytes<32>, u64)> {
         let to;
         if let Ok(address) = EthAddress::from_str(contract_address) {
             to = address;
@@ -96,8 +84,73 @@ impl Caller {
 
         let result = self.provider.send_raw_transaction(buf.into());
         match result {
-            Ok(tx_hash) => Ok(tx_hash),
+            Ok(tx_hash) => Ok((tx_hash, nonce)),
             Err(e) => Err(anyhow::anyhow!("Error sending transaction: {:?}", e)),
+        }
+    }
+    pub fn send_tx(
+        &self,
+        call: Vec<u8>,
+        contract_address: &str,
+        gas_limit: u128,
+        max_fee_per_gas: u128,
+        max_priority_fee_per_gas: u128,
+        value: U256,
+        chain_id: u64,
+    ) -> anyhow::Result<(FixedBytes<32>, u64)> {
+        // get nonce
+        let mut nonce = 0;
+        let tx_count = self
+            .provider
+            .get_transaction_count(self.signer.address(), None);
+        println!("tx_count: {:?}", tx_count);
+        if let Ok(tx_count) = tx_count {
+            nonce = tx_count.to::<u64>();
+            println!("nonce: {:?}", nonce);
+        } else {
+            println!("tx_count: {:?}", tx_count);
+            return Err(anyhow::anyhow!("Error getting transaction count"));
+        }
+
+        // get contract address
+        let to;
+        if let Ok(address) = EthAddress::from_str(contract_address) {
+            to = address;
+        } else {
+            return Err(anyhow::anyhow!("Invalid contract address"));
+        }
+
+        let mut tx = TxEip1559 {
+            chain_id: chain_id,
+            nonce: nonce,
+            to: TxKind::Call(to),
+            gas_limit: gas_limit,
+            max_fee_per_gas: max_fee_per_gas,
+            max_priority_fee_per_gas: max_priority_fee_per_gas,
+            input: call.into(),
+            value: value,
+            ..Default::default()
+        };
+
+        let sig = self.signer.sign_transaction_sync(&mut tx).unwrap();
+        let signed = TxEnvelope::from(tx.into_signed(sig));
+        let mut buf = vec![];
+        signed.encode_2718(&mut buf);
+
+        let result = self.provider.send_raw_transaction(buf.into());
+        match result {
+            Ok(tx_hash) => Ok((tx_hash, nonce)),
+            Err(e) => Err(anyhow::anyhow!("Error sending transaction: {:?}", e)),
+        }
+    }
+
+    pub fn get_logs(&self, filter: &Filter) -> anyhow::Result<Vec<Log>> {
+        match self.provider.get_logs(&filter) {
+            Ok(logs) => Ok(logs),
+            Err(_) => {
+                println!("failed to fetch logs!");
+                Err(anyhow::anyhow!("Error fetching logs!"))
+            }
         }
     }
 }

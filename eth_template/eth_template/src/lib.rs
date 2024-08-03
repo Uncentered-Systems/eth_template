@@ -7,7 +7,10 @@ use chrono::Utc;
 use kinode_process_lib::http::{bind_ws_path, send_ws_push, WsMessageType};
 use kinode_process_lib::{
     await_message, call_init,
-    eth::{EthConfigAction, NodeOrRpcUrl, Provider, ProviderConfig},
+    eth::{
+        Address as EthAddress, BlockNumberOrTag, EthConfigAction, Filter, NodeOrRpcUrl, Provider,
+        ProviderConfig,
+    },
     get_blob,
     http::{self},
     println, Address, LazyLoadBlob, Message, Request, Response,
@@ -23,7 +26,7 @@ use counter_caller::CounterCaller;
 mod types;
 use std::collections::HashMap;
 use std::str::FromStr;
-use types::{Action, PrivateKey, Wallet, State, WsPush, WsUpdate};
+use types::{Action, PrivateKey, State, Wallet, WsPush, WsUpdate};
 
 use crate::encryption::{decrypt_data, encrypt_data};
 
@@ -200,15 +203,13 @@ fn handle_terminal_message(
                                 parsed_wallet.address()
                             );
                             let wallet = Wallet::from(parsed_wallet);
-                            state.wallets.insert(
-                                *CURRENT_CHAIN_ID,
-                                PrivateKey::Decrypted(wallet.clone()),
-                            );
+                            state
+                                .wallets
+                                .insert(*CURRENT_CHAIN_ID, PrivateKey::Decrypted(wallet.clone()));
                             state.save();
-                            if let Some(caller) = Caller::new(
-                                *CURRENT_CHAIN_ID,
-                                wallet.private_key.as_str(),
-                            ) {
+                            if let Some(caller) =
+                                Caller::new(*CURRENT_CHAIN_ID, wallet.private_key.as_str())
+                            {
                                 *counter_caller = Some(CounterCaller {
                                     caller: caller,
                                     contract_address: CONTRACT_ADDRESS.to_string(),
@@ -225,6 +226,34 @@ fn handle_terminal_message(
             } else {
                 println!("to create wallet use EncryptWallet");
                 println!("no wallet for chainid {}", *CURRENT_CHAIN_ID);
+            }
+        }
+        Action::GetLogs => {
+            if let None = counter_caller {
+                println!("counter caller not instantied. please decrypt wallet first.");
+                return Ok(());
+            }
+            let counter_caller = counter_caller.as_ref().unwrap();
+
+            let filter: Filter = Filter::new()
+                .address(EthAddress::from_str(&counter_caller.contract_address).unwrap())
+                .from_block(0)
+                .to_block(BlockNumberOrTag::Latest);
+
+            let logs = counter_caller.caller.get_logs(&filter)?;
+            println!("Got logs");
+        }
+        Action::ManyIncrements(num) => {
+            if let None = counter_caller {
+                println!("counter caller not instantied. please decrypt wallet first.");
+                return Ok(());
+            }
+            let counter_caller = counter_caller.as_ref().unwrap();
+            let result = counter_caller.increment()?;
+            let mut nonce = result.1;
+            for i in 0..num.try_into().unwrap() {
+                let (result, new_nonce) = counter_caller.increment_with_nonce(nonce+1);
+                nonce = new_nonce;
             }
         }
     }
