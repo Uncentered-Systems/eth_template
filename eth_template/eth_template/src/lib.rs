@@ -8,7 +8,7 @@ use kinode_process_lib::http::{bind_ws_path, send_ws_push, WsMessageType};
 use kinode_process_lib::{
     await_message, call_init,
     eth::{
-        Address as EthAddress, BlockNumberOrTag, EthConfigAction, Filter, NodeOrRpcUrl, Provider,
+        Address as EthAddress, BlockNumberOrTag, EthConfigAction, NodeOrRpcUrl, Provider,
         ProviderConfig,
     },
     get_blob,
@@ -24,7 +24,6 @@ use alloy_signer::{LocalWallet, Signer};
 use counter_caller::CounterCaller;
 mod types;
 use std::collections::HashMap;
-use std::str::FromStr;
 use types::{Action, PrivateKey, State, Wallet, WsPush, WsUpdate};
 
 use crate::encryption::{decrypt_data, encrypt_data};
@@ -242,21 +241,20 @@ fn handle_terminal_message(
                 nonce = result.1;
             }
         }
-        Action::GetLogs => {
+        Action::GetLogs(from_block) => {
             if let None = counter_caller {
                 println!("counter caller not instantied. please decrypt wallet first.");
                 return Ok(());
             }
             let counter_caller = counter_caller.as_ref().unwrap();
 
-            let filter: Filter = Filter::new()
-                .address(EthAddress::from_str(&counter_caller.contract_address).unwrap())
-                .from_block(0)
-                .to_block(BlockNumberOrTag::Latest);
+            let logs = counter_caller.get_increment_logs(from_block)?;
 
-            let logs = counter_caller.caller.get_logs(&filter)?;
-            println!("logs: {:?}", logs.len());
-            println!("Got logs");
+            // overwrites index from scratch
+            // from_block usually supposed to be 0, for dev reasons its a var
+            state.increment_log_index = logs.to_vec();
+            state.save();
+            println!("state: {:#?}", state);
         }
     }
     return Ok(());

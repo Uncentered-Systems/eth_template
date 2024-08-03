@@ -12,6 +12,7 @@ use kinode_process_lib::{
     println,
 };
 use std::str::FromStr;
+use crate::counter_caller::COUNTER::NumberIncremented;
 
 pub struct Caller {
     pub provider: Provider,

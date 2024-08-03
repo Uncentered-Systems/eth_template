@@ -3,17 +3,21 @@ use crate::CURRENT_CHAIN_ID;
 use alloy_primitives::{FixedBytes, U256};
 use alloy_sol_types::{sol, SolCall};
 use kinode_process_lib::{
-    println
+    println, eth::{Filter, BlockNumberOrTag, Address as EthAddress, Log}
 };
+use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 /* ABI import */
 sol!(
     #[allow(missing_docs)]
     #[sol(rpc)]
-    #[derive(Debug)]
+    #[derive(Debug, Deserialize, Serialize)]
     COUNTER,
     "abi/Counter.json"
 );
+
+pub type NumberIncrementedLog = Log<COUNTER::NumberIncremented>;
 
 pub struct CounterCaller {
     pub caller: Caller,
@@ -74,5 +78,21 @@ impl CounterCaller {
             }
             Err(e) => Err(anyhow::anyhow!("Error calling number: {:?}", e)),
         }
+    }
+
+    pub fn get_increment_logs(&self, from_block: u64) -> anyhow::Result<Vec<Log<COUNTER::NumberIncremented>>> {
+        let filter: Filter = Filter::new()
+        .address(EthAddress::from_str(&self.contract_address).unwrap())
+        .from_block(from_block)
+        .to_block(BlockNumberOrTag::Latest);
+
+        let logs = self.caller.get_logs(&filter)?;
+        let mut result = Vec::new();
+        logs.iter().for_each(|log| {
+            if let Ok(decoded) = log.log_decode::<COUNTER::NumberIncremented>() {
+                result.push(decoded);
+            }
+        });
+        Ok(result)
     }
 }
