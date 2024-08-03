@@ -25,7 +25,6 @@ pub enum Action {
     EncryptWallet {private_key: Option<String>, password: String}, // if none, will use decrypted wallet key
     DecryptWallet(String),
     GetLogs,
-    ManyIncrements(U256),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

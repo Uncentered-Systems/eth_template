@@ -2,6 +2,9 @@ use crate::eth_utils::Caller;
 use crate::CURRENT_CHAIN_ID;
 use alloy_primitives::{FixedBytes, U256};
 use alloy_sol_types::{sol, SolCall};
+use kinode_process_lib::{
+    println
+};
 
 /* ABI import */
 sol!(
@@ -29,30 +32,32 @@ impl CounterCaller {
             U256::from(0),
             *CURRENT_CHAIN_ID,
         ) {
-            Ok((tx_hash, _nonce)) => Ok(tx_hash),
+            Ok(tx_hash) => Ok(tx_hash),
             Err(e) => Err(anyhow::anyhow!("Error setting number: {:?}", e)),
         }
     }
 
-    pub fn increment(&self) -> anyhow::Result<(FixedBytes<32>, u64)> {
+    pub fn increment(&self) -> anyhow::Result<FixedBytes<32>> {
         let call = COUNTER::incrementCall {}.abi_encode();
+        println!("here");
         match self.caller.send_tx(
             call,
             &self.contract_address,
-            1500000,
+            1500000, 
             10000000000,
             300000000,
             U256::from(0),
             *CURRENT_CHAIN_ID,
         ) {
-            Ok((tx_hash, nonce)) => Ok((tx_hash, nonce)),
-            Err(e) => Err(anyhow::anyhow!("Error incrementing counter: {:?}", e)),
+            Ok(tx_hash) => {
+                println!("tx_hash: {:?}", tx_hash);
+                Ok(tx_hash)
+            }
+            Err(e) => {
+                println!("Error incrementing counter: {:?}", e);
+                Err(anyhow::anyhow!("Error incrementing counter: {:?}", e))
+            }
         }
-    }
-
-    pub fn increment_with_nonce(&self, nonce: u64) -> (anyhow::Result<FixedBytes<32>>, u64) {
-        let call = COUNTER::incrementCall {}.abi_encode();
-        self.caller.send_tx_with_nonce(nonce, call, &self.contract_address, 1500000, 10000000000, 300000000, U256::from(0), *CURRENT_CHAIN_ID)
     }
 
     pub fn number(&self) -> anyhow::Result<U256> {

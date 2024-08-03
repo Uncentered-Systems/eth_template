@@ -16,5 +16,5 @@ contract DeployCounter is Script {
         counter = new Counter();
 
         vm.stopBroadcast();
-    }
+    }   
 }

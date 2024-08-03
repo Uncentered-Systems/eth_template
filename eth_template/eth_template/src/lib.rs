@@ -19,7 +19,6 @@ mod encryption;
 mod eth_utils;
 use eth_utils::Caller;
 mod counter_caller;
-use alloy::signers::{local::PrivateKeySigner, SignerSync};
 use alloy_primitives::{Signature, U256};
 use alloy_signer::{LocalWallet, Signer};
 use counter_caller::CounterCaller;
@@ -45,13 +44,15 @@ lazy_static! {
     pub static ref CONTRACT_ADDRESS: String = {
         let env_content = include_str!("../../../.env");
         from_read(Cursor::new(env_content)).expect("Failed to parse .env content");
-        match *CURRENT_CHAIN_ID {
+        let contract_address = match *CURRENT_CHAIN_ID {
             31337 => env::var("VITE_ANVIL_CONTRACT_ADDRESS").expect("CONTRACT_ADDRESS must be set"),
             11155111 => env::var("VITE_SEPOLIA_CONTRACT_ADDRESS").expect("CONTRACT_ADDRESS must be set"),
             1 => env::var("VITE_MAINNET_CONTRACT_ADDRESS").expect("CONTRACT_ADDRESS must be set"),
             10 => env::var("VITE_OPTIMISM_CONTRACT_ADDRESS").expect("CONTRACT_ADDRESS must be set"),
             _ => panic!("Invalid CURRENT_CHAIN_ID: {}", *CURRENT_CHAIN_ID),
-        }
+        };
+        println!("NEW contract address: {}", contract_address);
+        contract_address
     };
 
     pub static ref RPC_URL: NodeOrRpcUrl = {
@@ -241,20 +242,8 @@ fn handle_terminal_message(
                 .to_block(BlockNumberOrTag::Latest);
 
             let logs = counter_caller.caller.get_logs(&filter)?;
+            println!("logs: {:?}", logs.len());
             println!("Got logs");
-        }
-        Action::ManyIncrements(num) => {
-            if let None = counter_caller {
-                println!("counter caller not instantied. please decrypt wallet first.");
-                return Ok(());
-            }
-            let counter_caller = counter_caller.as_ref().unwrap();
-            let result = counter_caller.increment()?;
-            let mut nonce = result.1;
-            for i in 0..num.try_into().unwrap() {
-                let (result, new_nonce) = counter_caller.increment_with_nonce(nonce+1);
-                nonce = new_nonce;
-            }
         }
     }
     return Ok(());

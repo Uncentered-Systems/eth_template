@@ -57,7 +57,7 @@ impl Caller {
         max_priority_fee_per_gas: u128,
         value: U256,
         chain_id: u64,
-    ) -> anyhow::Result<(FixedBytes<32>, u64)> {
+    ) -> anyhow::Result<FixedBytes<32>> {
         let to;
         if let Ok(address) = EthAddress::from_str(contract_address) {
             to = address;
@@ -84,7 +84,7 @@ impl Caller {
 
         let result = self.provider.send_raw_transaction(buf.into());
         match result {
-            Ok(tx_hash) => Ok((tx_hash, nonce)),
+            Ok(tx_hash) => Ok(tx_hash),
             Err(e) => Err(anyhow::anyhow!("Error sending transaction: {:?}", e)),
         }
     }
@@ -97,8 +97,9 @@ impl Caller {
         max_priority_fee_per_gas: u128,
         value: U256,
         chain_id: u64,
-    ) -> anyhow::Result<(FixedBytes<32>, u64)> {
+    ) -> anyhow::Result<FixedBytes<32>> {
         // get nonce
+        println!("here1");
         let mut nonce = 0;
         let tx_count = self
             .provider
@@ -139,7 +140,7 @@ impl Caller {
 
         let result = self.provider.send_raw_transaction(buf.into());
         match result {
-            Ok(tx_hash) => Ok((tx_hash, nonce)),
+            Ok(tx_hash) => Ok(tx_hash),
             Err(e) => Err(anyhow::anyhow!("Error sending transaction: {:?}", e)),
         }
     }
@@ -147,8 +148,8 @@ impl Caller {
     pub fn get_logs(&self, filter: &Filter) -> anyhow::Result<Vec<Log>> {
         match self.provider.get_logs(&filter) {
             Ok(logs) => Ok(logs),
-            Err(_) => {
-                println!("failed to fetch logs!");
+            Err(e) => {
+                println!("failed to fetch logs: {:?}", e);
                 Err(anyhow::anyhow!("Error fetching logs!"))
             }
         }
