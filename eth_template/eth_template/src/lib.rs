@@ -3,13 +3,14 @@ use lazy_static::lazy_static;
 use std::env;
 use std::io::Cursor;
 
+use crate::counter_caller::COUNTER;
 use chrono::Utc;
 use kinode_process_lib::http::{bind_ws_path, send_ws_push, WsMessageType};
 use kinode_process_lib::{
     await_message, call_init,
     eth::{
-        Address as EthAddress, BlockNumberOrTag, EthConfigAction, NodeOrRpcUrl, Provider,
-        ProviderConfig,
+        Address as EthAddress, BlockNumberOrTag, EthConfigAction, EthSubResult, NodeOrRpcUrl,
+        Provider, ProviderConfig, SubscriptionResult,
     },
     get_blob,
     http::{self},
@@ -224,8 +225,7 @@ fn handle_terminal_message(
                     Err(_) => println!("Decryption failed, try again."),
                 }
             } else {
-                println!("to create wallet use EncryptWallet");
-                println!("no wallet for chainid {}", *CURRENT_CHAIN_ID);
+                println!("either wallet already decrypted or no wallet created yet for chainid {}", *CURRENT_CHAIN_ID);
             }
         }
         Action::ManyIncrements(num) => {
@@ -236,8 +236,8 @@ fn handle_terminal_message(
             let counter_caller = counter_caller.as_ref().unwrap();
             let result = counter_caller.increment()?;
             let mut nonce = result.1;
-            for i in 0..num.try_into().unwrap() {
-                let result = counter_caller.increment_with_nonce(nonce+1)?;
+            for i in 1..num.try_into().unwrap() {
+                let result = counter_caller.increment_with_nonce(nonce + 1)?;
                 nonce = result.1;
             }
         }
@@ -248,16 +248,67 @@ fn handle_terminal_message(
             }
             let counter_caller = counter_caller.as_ref().unwrap();
 
-            let logs = counter_caller.get_increment_logs(from_block)?;
+            state.increment_log_index = counter_caller.get_increment_logs(from_block)?;
 
             // overwrites index from scratch
             // from_block usually supposed to be 0, for dev reasons its a var
-            state.increment_log_index = logs.to_vec();
             state.save();
-            println!("state: {:#?}", state);
+            println!("state: {:#?}", state.increment_log_index);
+        }
+        Action::SubscribeLogs => {
+            if let None = counter_caller {
+                println!("counter caller not instantied. please decrypt wallet first.");
+                return Ok(());
+            }
+            let counter_caller = counter_caller.as_ref().unwrap();
+
+            counter_caller.subscribe_logs()?;
+        }
+        Action::UnsubscribeLogs => {
+            if let None = counter_caller {
+                println!("counter caller not instantied. please decrypt wallet first.");
+                return Ok(());
+            }
+            let counter_caller = counter_caller.as_ref().unwrap();
+
+            counter_caller.unsubscribe_logs()?;
         }
     }
     return Ok(());
+}
+
+fn handle_eth_message(
+    state: &mut State,
+    counter_caller: &mut Option<CounterCaller>,
+    message: &Message,
+) -> anyhow::Result<()> {
+    let eth_result = match serde_json::from_slice::<EthSubResult>(&message.body()) {
+        Ok(deserialized) => deserialized,
+        Err(e) => {
+            println!("Failed to deserialize message body: {:?}", e);
+            return Ok(());
+        }
+    };
+    // println!("eth result: {:#?}", eth_result);
+    if let Err(e) = eth_result {
+        println!("error receiving eth result: {:#?}", e);
+    } else {
+        match eth_result.unwrap().result {
+            SubscriptionResult::Log(log) => {
+                // println!("log: {:#?}", log);
+                if let Ok(decoded) = log.log_decode::<COUNTER::NumberIncremented>() {
+                    state.increment_log_index.insert(
+                        log.block_timestamp.unwrap_or_default(),
+                        decoded.inner.data.newNumber,
+                    );
+                    state.save();
+                    println!("index len: {:#?}", state.increment_log_index.len());
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
 }
 
 fn handle_message(
@@ -272,6 +323,10 @@ fn handle_message(
     {
         println!("HTTP request received.");
         return handle_http_request(state, ws_channel_id, &message, counter_caller);
+    }
+    if let "eth:distro:sys" = message.source().process.to_string().as_str() {
+        println!("ETH message received.");
+        return handle_eth_message(state, counter_caller, &message);
     }
     if message.is_local(&message.source()) {
         println!("Local message received from: {:?}", message.source());

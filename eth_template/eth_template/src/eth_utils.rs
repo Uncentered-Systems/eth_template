@@ -12,7 +12,6 @@ use kinode_process_lib::{
     println,
 };
 use std::str::FromStr;
-use crate::counter_caller::COUNTER::NumberIncremented;
 
 pub struct Caller {
     pub provider: Provider,
@@ -152,6 +151,26 @@ impl Caller {
             Err(e) => {
                 println!("failed to fetch logs: {:?}", e);
                 Err(anyhow::anyhow!("Error fetching logs!"))
+            }
+        }
+    }
+
+    pub fn subscribe_logs(&self, sub_id: u64, filter: &Filter) -> anyhow::Result<()> {
+        match self.provider.subscribe(sub_id, filter.clone()) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                println!("failed to subscribe: {:?}", e);
+                Err(anyhow::anyhow!("Error subscribing!"))
+            }
+        }
+    }
+
+    pub fn unsubscribe_logs(&self, sub_id: u64) -> anyhow::Result<()> {
+        match self.provider.unsubscribe(sub_id) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                println!("failed to unsubscribe: {:?}", e);
+                Err(anyhow::anyhow!("Error unsubscribing!"))
             }
         }
     }

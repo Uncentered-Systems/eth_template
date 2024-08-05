@@ -26,6 +26,8 @@ pub enum Action {
     DecryptWallet(String),
     GetLogs(u64), // from block
     ManyIncrements(u64),
+    SubscribeLogs,
+    UnsubscribeLogs,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,12 +51,11 @@ impl From<LocalWallet> for Wallet {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct State {
     pub our: Address,
     pub wallets: HashMap<u64, PrivateKey>, //chain id to wallet
-    pub increment_log_index: Vec<NumberIncrementedLog>
+    pub increment_log_index: HashMap<u64, U256> // timestamp when it was incremented to counter number
 }
 
 impl State {
@@ -62,7 +63,7 @@ impl State {
         State {
             our: our.clone(),
             wallets: HashMap::new(),
-            increment_log_index: Vec::new(),
+            increment_log_index: HashMap::new(),
         }
     }
     pub fn fetch() -> Option<State> {
