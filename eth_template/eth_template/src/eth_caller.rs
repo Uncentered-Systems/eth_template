@@ -7,10 +7,19 @@ use kinode_process_lib::{
     println,
 };
 use serde::{Deserialize, Serialize};
+use std::{collections::HashMap};
+use std::hash::{Hash, Hasher, DefaultHasher};
 use std::str::FromStr;
-use std::collections::HashMap;
 
 /* ABI import */
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    #[derive(Debug, Deserialize, Serialize)]
+    USDC,
+    "abi/Usdc.json"
+);
+
 sol!(
     #[allow(missing_docs)]
     #[sol(rpc)]
@@ -19,19 +28,26 @@ sol!(
     "abi/Counter.json"
 );
 
-pub type NumberIncrementedLog = Log<COUNTER::NumberIncremented>;
-
-pub struct CounterCaller {
-    pub caller: Caller,
-    pub contract_address: String,
+#[derive(Eq, Hash, PartialEq)]
+pub enum ContractName {
+    Usdc,
+    Counter,
 }
 
-impl CounterCaller {
+pub struct EthCaller {
+    pub caller: Caller,
+    pub contract_addresses: HashMap<ContractName, String>,
+}
+
+impl EthCaller {
+    // usdc methods
+    
+    // counter methods
     pub fn set_number(&self, number: U256) -> anyhow::Result<FixedBytes<32>> {
         let call = COUNTER::setNumberCall { newNumber: number }.abi_encode();
         match self.caller.send_tx(
             call,
-            &self.contract_address,
+            &self.contract_addresses.get(&ContractName::Counter).unwrap_or(&"".to_string()),
             1500000,
             10000000000,
             300000000,
@@ -48,7 +64,7 @@ impl CounterCaller {
         self.caller.send_tx_with_nonce(
             nonce,
             call,
-            &self.contract_address,
+            &self.contract_addresses.get(&ContractName::Counter).unwrap_or(&"".to_string()),
             1500000,
             10000000000,
             300000000,
@@ -62,7 +78,7 @@ impl CounterCaller {
         println!("here");
         match self.caller.send_tx(
             call,
-            &self.contract_address,
+            &self.contract_addresses.get(&ContractName::Counter).unwrap_or(&"".to_string()),
             1500000,
             10000000000,
             300000000,
@@ -82,7 +98,13 @@ impl CounterCaller {
 
     pub fn number(&self) -> anyhow::Result<U256> {
         let call: Vec<u8> = COUNTER::numberCall {}.abi_encode();
-        match self.caller.tx_req(call, &self.contract_address) {
+        match self.caller.tx_req(
+            call,
+            &self
+                .contract_addresses
+                .get(&ContractName::Counter)
+                .unwrap_or(&"".to_string()),
+        ) {
             Ok(bytes) => {
                 let number = U256::from_be_slice(&bytes);
                 Ok(number)
@@ -91,12 +113,17 @@ impl CounterCaller {
         }
     }
 
-    pub fn get_increment_logs(
-        &self,
-        from_block: u64,
-    ) -> anyhow::Result<HashMap<u64, U256>> {
+    pub fn get_increment_logs(&self, from_block: u64) -> anyhow::Result<HashMap<u64, U256>> {
         let filter: Filter = Filter::new()
-            .address(EthAddress::from_str(&self.contract_address).unwrap())
+            .address(
+                EthAddress::from_str(
+                    &self
+                        .contract_addresses
+                        .get(&ContractName::Counter)
+                        .unwrap_or(&"".to_string()),
+                )
+                .unwrap(),
+            )
             .from_block(from_block)
             .to_block(BlockNumberOrTag::Latest);
 
@@ -115,14 +142,21 @@ impl CounterCaller {
         Ok(index)
     }
 
-    pub fn subscribe_logs(&self) -> anyhow::Result<()> {
-        let filter: Filter =
-            Filter::new().address(EthAddress::from_str(&self.contract_address).unwrap());
+    // general methods
+    pub fn subscribe_logs(&self, contract_name: ContractName) -> anyhow::Result<()> {
+        let filter: Filter = Filter::new().address(
+            EthAddress::from_str(&self.contract_addresses.get(&contract_name).unwrap())
+                .unwrap(),
+        );
 
-        self.caller.subscribe_logs(0, &filter)
+        let mut hasher: DefaultHasher = DefaultHasher::new();
+        ContractName::Counter.hash(&mut hasher);
+        self.caller.subscribe_logs(hasher.finish(), &filter)
     }
 
-    pub fn unsubscribe_logs(&self) -> anyhow::Result<()> {
-        self.caller.unsubscribe_logs(0)
+    pub fn unsubscribe_logs(&self, contract_name: ContractName) -> anyhow::Result<()> {
+        let mut hasher: DefaultHasher = DefaultHasher::new();
+        contract_name.hash(&mut hasher);
+        self.caller.unsubscribe_logs(hasher.finish())
     }
 }

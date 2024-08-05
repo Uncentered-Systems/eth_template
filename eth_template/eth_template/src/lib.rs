@@ -3,8 +3,7 @@ use lazy_static::lazy_static;
 use std::env;
 use std::io::Cursor;
 
-use crate::counter_caller::COUNTER;
-use chrono::Utc;
+use crate::eth_caller::COUNTER;
 use kinode_process_lib::http::{bind_ws_path, send_ws_push, WsMessageType};
 use kinode_process_lib::{
     await_message, call_init,
@@ -19,10 +18,10 @@ use kinode_process_lib::{
 mod encryption;
 mod eth_utils;
 use eth_utils::Caller;
-mod counter_caller;
+mod eth_caller;
 use alloy_primitives::{Signature, U256};
 use alloy_signer::{LocalWallet, Signer};
-use counter_caller::CounterCaller;
+use eth_caller::{ContractName, EthCaller};
 mod types;
 use std::collections::HashMap;
 use types::{Action, PrivateKey, State, Wallet, WsPush, WsUpdate};
@@ -41,7 +40,7 @@ lazy_static! {
         env::var("VITE_CURRENT_CHAIN_ID").expect("CHAIN_ID must be set").parse().unwrap()
     };
 
-    pub static ref CONTRACT_ADDRESS: String = {
+    pub static ref COUNTER_CONTRACT_ADDRESS: String = {
         let env_content = include_str!("../../../.env");
         from_read(Cursor::new(env_content)).expect("Failed to parse .env content");
         let contract_address = match *CURRENT_CHAIN_ID {
@@ -70,13 +69,22 @@ lazy_static! {
     pub static ref MIN_ETH_WAGER: U256 = {
         "100000000000000".parse().unwrap() // 0.0001 eth
     };
+
+    pub static ref USDC_CONTRACT_ADDRESS: String = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48".to_string();
+}
+
+fn initialize_addresses() -> HashMap<ContractName, String> {
+    let mut map = HashMap::new();
+    map.insert(ContractName::Counter, COUNTER_CONTRACT_ADDRESS.to_string());
+    map.insert(ContractName::Usdc, USDC_CONTRACT_ADDRESS.to_string());
+    map
 }
 
 fn handle_http_request(
     state: &mut State,
     ws_channel_id: &mut Option<u32>,
     message: &Message,
-    counter_caller: &mut Option<CounterCaller>,
+    eth_caller: &mut Option<EthCaller>,
 ) -> anyhow::Result<()> {
     let our_http_request = serde_json::from_slice::<http::HttpServerRequest>(message.body())?;
     match our_http_request {
@@ -98,24 +106,24 @@ fn handle_http_request(
             };
 
             println!("got web socket push");
-            if let None = counter_caller {
-                println!("counter caller not instantied. please decrypt wallet first.");
+            if let None = eth_caller {
+                println!("eth caller not instantied. please decrypt wallet first.");
                 return Ok(());
             }
-            let counter_caller = counter_caller.as_ref().unwrap();
+            let eth_caller = eth_caller.as_ref().unwrap();
 
             let ws_push = serde_json::from_slice::<WsPush>(&blob.bytes)?;
             match ws_push {
                 WsPush::SetNumber(number) => {
-                    let _ = counter_caller.set_number(number);
+                    let _ = eth_caller.set_number(number);
                     println!("Setting number to: {}", number);
                 }
                 WsPush::Increment => {
-                    let _ = counter_caller.increment();
+                    let _ = eth_caller.increment();
                     println!("Incremented");
                 }
                 WsPush::Number => {
-                    let number = counter_caller.number()?;
+                    let number = eth_caller.number()?;
                     println!("Got number: {}", number);
                     send_ws_push(
                         channel_id,
@@ -142,7 +150,7 @@ fn handle_http_request(
 // used for eth contract testing
 fn handle_terminal_message(
     state: &mut State,
-    counter_caller: &mut Option<CounterCaller>,
+    eth_caller: &mut Option<EthCaller>,
     ws_channel_id: &mut Option<u32>,
     message: &Message,
 ) -> anyhow::Result<()> {
@@ -188,7 +196,7 @@ fn handle_terminal_message(
             } else {
                 println!("Failed to parse wallet key, try again.");
             }
-            *counter_caller = None;
+            *eth_caller = None;
         }
         Action::DecryptWallet(password) => {
             if let Some(PrivateKey::Encrypted(encrypted_key)) = state.wallets.get(&CURRENT_CHAIN_ID)
@@ -211,13 +219,13 @@ fn handle_terminal_message(
                             if let Some(caller) =
                                 Caller::new(*CURRENT_CHAIN_ID, wallet.private_key.as_str())
                             {
-                                *counter_caller = Some(CounterCaller {
+                                *eth_caller = Some(EthCaller {
                                     caller: caller,
-                                    contract_address: CONTRACT_ADDRESS.to_string(),
+                                    contract_addresses: initialize_addresses(),
                                 });
                             } else {
                                 println!("Failed to create caller, try again.");
-                                *counter_caller = None;
+                                *eth_caller = None;
                             }
                         }
                         None => println!("Failed to parse wallet, try again."),
@@ -229,26 +237,26 @@ fn handle_terminal_message(
             }
         }
         Action::ManyIncrements(num) => {
-            if let None = counter_caller {
-                println!("counter caller not instantied. please decrypt wallet first.");
+            if let None = eth_caller {
+                println!("eth caller not instantied. please decrypt wallet first.");
                 return Ok(());
             }
-            let counter_caller = counter_caller.as_ref().unwrap();
-            let result = counter_caller.increment()?;
+            let eth_caller = eth_caller.as_ref().unwrap();
+            let result = eth_caller.increment()?;
             let mut nonce = result.1;
             for i in 1..num.try_into().unwrap() {
-                let result = counter_caller.increment_with_nonce(nonce + 1)?;
+                let result = eth_caller.increment_with_nonce(nonce + 1)?;
                 nonce = result.1;
             }
         }
         Action::GetLogs(from_block) => {
-            if let None = counter_caller {
-                println!("counter caller not instantied. please decrypt wallet first.");
+            if let None = eth_caller {
+                println!("eth caller not instantied. please decrypt wallet first.");
                 return Ok(());
             }
-            let counter_caller = counter_caller.as_ref().unwrap();
+            let eth_caller = eth_caller.as_ref().unwrap();
 
-            state.increment_log_index = counter_caller.get_increment_logs(from_block)?;
+            state.increment_log_index = eth_caller.get_increment_logs(from_block)?;
 
             // overwrites index from scratch
             // from_block usually supposed to be 0, for dev reasons its a var
@@ -256,22 +264,26 @@ fn handle_terminal_message(
             println!("state: {:#?}", state.increment_log_index);
         }
         Action::SubscribeLogs => {
-            if let None = counter_caller {
-                println!("counter caller not instantied. please decrypt wallet first.");
+            if let None = eth_caller {
+                println!("eth caller not instantied. please decrypt wallet first.");
                 return Ok(());
             }
-            let counter_caller = counter_caller.as_ref().unwrap();
+            let eth_caller = eth_caller.as_ref().unwrap();
 
-            counter_caller.subscribe_logs()?;
+            eth_caller.subscribe_logs(ContractName::Counter)?;
         }
         Action::UnsubscribeLogs => {
-            if let None = counter_caller {
-                println!("counter caller not instantied. please decrypt wallet first.");
+            if let None = eth_caller {
+                println!("eth caller not instantied. please decrypt wallet first.");
                 return Ok(());
             }
-            let counter_caller = counter_caller.as_ref().unwrap();
+            let eth_caller = eth_caller.as_ref().unwrap();
 
-            counter_caller.unsubscribe_logs()?;
+            eth_caller.unsubscribe_logs(ContractName::Counter)?;
+        }
+        Action::GetUSDCLogs => {
+            // let eth_caller = eth_caller.as_ref().unwrap();
+            // eth_caller.get_usdc_logs()?;
         }
     }
     return Ok(());
@@ -279,7 +291,7 @@ fn handle_terminal_message(
 
 fn handle_eth_message(
     state: &mut State,
-    counter_caller: &mut Option<CounterCaller>,
+    eth_caller: &mut Option<EthCaller>,
     message: &Message,
 ) -> anyhow::Result<()> {
     let eth_result = match serde_json::from_slice::<EthSubResult>(&message.body()) {
@@ -313,7 +325,7 @@ fn handle_eth_message(
 
 fn handle_message(
     state: &mut State,
-    counter_caller: &mut Option<CounterCaller>,
+    eth_caller: &mut Option<EthCaller>,
     ws_channel_id: &mut Option<u32>,
 ) -> anyhow::Result<()> {
     let message = await_message()?;
@@ -322,17 +334,17 @@ fn handle_message(
         message.source().process.to_string().as_str()
     {
         println!("HTTP request received.");
-        return handle_http_request(state, ws_channel_id, &message, counter_caller);
+        return handle_http_request(state, ws_channel_id, &message, eth_caller);
     }
     if let "eth:distro:sys" = message.source().process.to_string().as_str() {
         println!("ETH message received.");
-        return handle_eth_message(state, counter_caller, &message);
+        return handle_eth_message(state, eth_caller, &message);
     }
     if message.is_local(&message.source()) {
         println!("Local message received from: {:?}", message.source());
 
         if message.source().process.package_name == "terminal" {
-            return handle_terminal_message(state, counter_caller, ws_channel_id, &message);
+            return handle_terminal_message(state, eth_caller, ws_channel_id, &message);
         }
     } else {
         println!("Message from invalid source: {:?}", message.source());
@@ -364,16 +376,16 @@ fn init(our: Address) {
             .unwrap(),
         )
         .send();
-    let mut counter_caller: Option<CounterCaller> = None;
+    let mut eth_caller: Option<EthCaller> = None;
     if let Some(PrivateKey::Decrypted(wallet)) = state.wallets.get(&CURRENT_CHAIN_ID) {
-        counter_caller = Some(CounterCaller {
+        eth_caller = Some(EthCaller {
             caller: Caller::new(*CURRENT_CHAIN_ID, &wallet.private_key).unwrap(),
-            contract_address: CONTRACT_ADDRESS.to_string(),
+            contract_addresses: initialize_addresses(),
         });
     }
 
     loop {
-        match handle_message(&mut state, &mut counter_caller, &mut ws_channel_id) {
+        match handle_message(&mut state, &mut eth_caller, &mut ws_channel_id) {
             Ok(()) => {}
             Err(e) => {
                 println!("error from somewhere: {:?}", e);

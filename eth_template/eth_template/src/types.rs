@@ -1,10 +1,8 @@
-use crate::counter_caller::CounterCaller;
 use alloy_primitives::U256;
 use serde::{Serialize, Deserialize};
-use kinode_process_lib::{Address, get_state, set_state, eth::{Log, }};
+use kinode_process_lib::{Address, get_state, set_state};
 use std::collections::HashMap;
-use alloy_signer::{k256::ecdsa::SigningKey, LocalWallet, Signer};
-use crate::counter_caller::NumberIncrementedLog;
+use alloy_signer::{LocalWallet, Signer};
 
 // from UI to backend
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -28,6 +26,7 @@ pub enum Action {
     ManyIncrements(u64),
     SubscribeLogs,
     UnsubscribeLogs,
+    GetUSDCLogs
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
