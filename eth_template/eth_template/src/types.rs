@@ -26,7 +26,7 @@ pub enum Action {
     ManyIncrements(u64),
     SubscribeLogs,
     UnsubscribeLogs,
-    GetUSDCLogs
+    GetUsdcLogs(u64)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

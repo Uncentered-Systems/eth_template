@@ -1,3 +1,4 @@
+use chrono::naive::NaiveDateDaysIterator;
 use dotenvy::from_read;
 use lazy_static::lazy_static;
 use std::env;
@@ -8,8 +9,8 @@ use kinode_process_lib::http::{bind_ws_path, send_ws_push, WsMessageType};
 use kinode_process_lib::{
     await_message, call_init,
     eth::{
-        Address as EthAddress, BlockNumberOrTag, EthConfigAction, EthSubResult, NodeOrRpcUrl,
-        Provider, ProviderConfig, SubscriptionResult,
+        Address as EthAddress, EthConfigAction, EthSubResult, Filter, NodeOrRpcUrl, ProviderConfig,
+        SubscriptionResult, BlockNumberOrTag
     },
     get_blob,
     http::{self},
@@ -24,6 +25,7 @@ use alloy_signer::{LocalWallet, Signer};
 use eth_caller::{ContractName, EthCaller};
 mod types;
 use std::collections::HashMap;
+use std::str::FromStr;
 use types::{Action, PrivateKey, State, Wallet, WsPush, WsUpdate};
 
 use crate::encryption::{decrypt_data, encrypt_data};
@@ -70,7 +72,7 @@ lazy_static! {
         "100000000000000".parse().unwrap() // 0.0001 eth
     };
 
-    pub static ref USDC_CONTRACT_ADDRESS: String = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48".to_string();
+    pub static ref USDC_CONTRACT_ADDRESS: String = "0xf08A50178dfcDe18524640EA6618a1f965821715".to_string();
 }
 
 fn initialize_addresses() -> HashMap<ContractName, String> {
@@ -233,7 +235,10 @@ fn handle_terminal_message(
                     Err(_) => println!("Decryption failed, try again."),
                 }
             } else {
-                println!("either wallet already decrypted or no wallet created yet for chainid {}", *CURRENT_CHAIN_ID);
+                println!(
+                    "either wallet already decrypted or no wallet created yet for chainid {}",
+                    *CURRENT_CHAIN_ID
+                );
             }
         }
         Action::ManyIncrements(num) => {
@@ -281,9 +286,27 @@ fn handle_terminal_message(
 
             eth_caller.unsubscribe_logs(ContractName::Counter)?;
         }
-        Action::GetUSDCLogs => {
-            // let eth_caller = eth_caller.as_ref().unwrap();
-            // eth_caller.get_usdc_logs()?;
+        Action::GetUsdcLogs(from_block) => {
+            if let None = eth_caller {
+                println!("eth caller not instantied. please decrypt wallet first.");
+                return Ok(());
+            }
+            let eth_caller: &EthCaller = eth_caller.as_ref().unwrap();
+
+            let filter: Filter = Filter::new()
+                .address(
+                    EthAddress::from_str(
+                        &eth_caller
+                            .contract_addresses
+                            .get(&ContractName::Usdc)
+                            .unwrap(),
+                    )
+                    .unwrap(),
+                )
+                .from_block(from_block)
+                .to_block(BlockNumberOrTag::Latest);
+            let logs = eth_caller.caller.get_logs_safely(&filter)?;
+            println!("logs: {:#?}", logs.len());
         }
     }
     return Ok(());

@@ -41,7 +41,7 @@ pub struct EthCaller {
 
 impl EthCaller {
     // usdc methods
-    
+
     // counter methods
     pub fn set_number(&self, number: U256) -> anyhow::Result<FixedBytes<32>> {
         let call = COUNTER::setNumberCall { newNumber: number }.abi_encode();
