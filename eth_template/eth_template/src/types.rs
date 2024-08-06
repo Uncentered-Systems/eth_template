@@ -24,8 +24,8 @@ pub enum Action {
     DecryptWallet(String),
     GetLogs(u64), // from block
     ManyIncrements(u64),
-    SubscribeLogs,
-    UnsubscribeLogs,
+    SubscribeIncrementLogs,
+    UnsubscribeIncrementLogs,
     GetUsdcLogs(u64)
 }
 

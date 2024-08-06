@@ -14,6 +14,8 @@ use kinode_process_lib::{
     println,
 };
 use std::str::FromStr;
+use std::hash::{DefaultHasher, Hash, Hasher};
+
 
 pub struct Caller {
     pub provider: Provider,
@@ -101,17 +103,16 @@ impl Caller {
         chain_id: u64,
     ) -> anyhow::Result<(FixedBytes<32>, u64)> {
         // get nonce
-        println!("here1");
         let mut nonce = 0;
         let tx_count = self
             .provider
             .get_transaction_count(self.signer.address(), None);
-        println!("tx_count: {:?}", tx_count);
+        // println!("tx_count: {:?}", tx_count);
         if let Ok(tx_count) = tx_count {
             nonce = tx_count.to::<u64>();
-            println!("nonce: {:?}", nonce);
+            // println!("nonce: {:?}", nonce);
         } else {
-            println!("tx_count: {:?}", tx_count);
+            // println!("tx_count: {:?}", tx_count);
             return Err(anyhow::anyhow!("Error getting transaction count"));
         }
 
@@ -288,8 +289,11 @@ impl Caller {
         }
     }
 
-    pub fn subscribe_logs(&self, sub_id: u64, filter: &Filter) -> anyhow::Result<()> {
-        match self.provider.subscribe(sub_id, filter.clone()) {
+    // sub_id = hashed filter
+    pub fn subscribe_logs(&self, filter: &Filter) -> anyhow::Result<()> {
+        let mut hasher: DefaultHasher = DefaultHasher::new();
+        filter.hash(&mut hasher);
+        match self.provider.subscribe(hasher.finish(), filter.clone()) {
             Ok(_) => Ok(()),
             Err(e) => {
                 println!("failed to subscribe: {:?}", e);
@@ -298,8 +302,11 @@ impl Caller {
         }
     }
 
-    pub fn unsubscribe_logs(&self, sub_id: u64) -> anyhow::Result<()> {
-        match self.provider.unsubscribe(sub_id) {
+    // sub_id = hashed filter
+    pub fn unsubscribe_logs(&self, filter: &Filter) -> anyhow::Result<()> {
+        let mut hasher: DefaultHasher = DefaultHasher::new();
+        filter.hash(&mut hasher);
+        match self.provider.unsubscribe(hasher.finish()) {
             Ok(_) => Ok(()),
             Err(e) => {
                 println!("failed to unsubscribe: {:?}", e);

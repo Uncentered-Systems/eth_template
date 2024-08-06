@@ -8,7 +8,6 @@ use kinode_process_lib::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::str::FromStr;
 
 /* ABI import */
@@ -148,20 +147,25 @@ impl EthCaller {
         Ok(index)
     }
 
-    // general methods
-    pub fn subscribe_logs(&self, contract_name: ContractName) -> anyhow::Result<()> {
-        let filter: Filter = Filter::new().address(
-            EthAddress::from_str(&self.contract_addresses.get(&contract_name).unwrap()).unwrap(),
-        );
+    pub fn subscribe_increment_logs(&self, contract_name: ContractName) -> anyhow::Result<()> {
+        let filter: Filter = Filter::new()
+            .address(
+                EthAddress::from_str(&self.contract_addresses.get(&contract_name).unwrap())
+                    .unwrap(),
+            )
+            .event("NumberIncremented(uint256)");
 
-        let mut hasher: DefaultHasher = DefaultHasher::new();
-        ContractName::Counter.hash(&mut hasher);
-        self.caller.subscribe_logs(hasher.finish(), &filter)
+        self.caller.subscribe_logs(&filter)
     }
 
-    pub fn unsubscribe_logs(&self, contract_name: ContractName) -> anyhow::Result<()> {
-        let mut hasher: DefaultHasher = DefaultHasher::new();
-        contract_name.hash(&mut hasher);
-        self.caller.unsubscribe_logs(hasher.finish())
+    pub fn unsubscribe_increment_logs(&self, contract_name: ContractName) -> anyhow::Result<()> {
+        let filter: Filter = Filter::new()
+        .address(
+            EthAddress::from_str(&self.contract_addresses.get(&contract_name).unwrap())
+                .unwrap(),
+        )
+        .event("NumberIncremented(uint256)");
+
+        self.caller.unsubscribe_logs(&filter)
     }
 }

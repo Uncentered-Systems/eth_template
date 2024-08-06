@@ -268,23 +268,23 @@ fn handle_terminal_message(
             state.save();
             println!("state: {:#?}", state.increment_log_index);
         }
-        Action::SubscribeLogs => {
+        Action::SubscribeIncrementLogs => {
             if let None = eth_caller {
                 println!("eth caller not instantied. please decrypt wallet first.");
                 return Ok(());
             }
             let eth_caller = eth_caller.as_ref().unwrap();
 
-            eth_caller.subscribe_logs(ContractName::Counter)?;
+            eth_caller.subscribe_increment_logs(ContractName::Counter)?;
         }
-        Action::UnsubscribeLogs => {
+        Action::UnsubscribeIncrementLogs => {
             if let None = eth_caller {
                 println!("eth caller not instantied. please decrypt wallet first.");
                 return Ok(());
             }
             let eth_caller = eth_caller.as_ref().unwrap();
 
-            eth_caller.unsubscribe_logs(ContractName::Counter)?;
+            eth_caller.unsubscribe_increment_logs(ContractName::Counter)?;
         }
         Action::GetUsdcLogs(from_block) => {
             if let None = eth_caller {
@@ -330,7 +330,7 @@ fn handle_eth_message(
     } else {
         match eth_result.unwrap().result {
             SubscriptionResult::Log(log) => {
-                // println!("log: {:#?}", log);
+                println!("log: {:#?}", log);
                 if let Ok(decoded) = log.log_decode::<COUNTER::NumberIncremented>() {
                     state.increment_log_index.insert(
                         log.block_timestamp.unwrap_or_default(),
