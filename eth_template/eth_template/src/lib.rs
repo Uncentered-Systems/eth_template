@@ -72,7 +72,16 @@ lazy_static! {
         "100000000000000".parse().unwrap() // 0.0001 eth
     };
 
-    pub static ref USDC_CONTRACT_ADDRESS: String = "0xf08A50178dfcDe18524640EA6618a1f965821715".to_string();
+    pub static ref USDC_CONTRACT_ADDRESS: String = {
+        let env_content = include_str!("../../../.env");
+        from_read(Cursor::new(env_content)).expect("Failed to parse .env content");
+        let contract_address = match *CURRENT_CHAIN_ID {
+            10 => env::var("VITE_OPTIMISM_USDC_CONTRACT_ADDRESS").expect("USDC CONTRACT_ADDRESS must be set"),
+            _ => "".to_string(),
+        };
+        println!("NEW USDC contract address: {}", contract_address);
+        contract_address
+    }; 
 }
 
 fn initialize_addresses() -> HashMap<ContractName, String> {
@@ -304,7 +313,9 @@ fn handle_terminal_message(
                     .unwrap(),
                 )
                 .from_block(from_block)
-                .to_block(BlockNumberOrTag::Latest);
+                .to_block(BlockNumberOrTag::Latest)
+                .event("Transfer(address indexed _from, address indexed _to, uint256 _value)");
+                //.topic1(user_address); 
             let logs = eth_caller.caller.get_logs_safely(&filter)?;
             println!("logs: {:#?}", logs.len());
         }

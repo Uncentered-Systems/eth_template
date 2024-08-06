@@ -13,9 +13,8 @@ use kinode_process_lib::{
     },
     println,
 };
-use std::str::FromStr;
 use std::hash::{DefaultHasher, Hash, Hasher};
-
+use std::str::FromStr;
 
 pub struct Caller {
     pub provider: Provider,
@@ -166,7 +165,6 @@ impl Caller {
         }
     }
 
-    
     /*
     outside loop - once success received, divide by correct number of times
     inner loop - keep trying until first success
@@ -187,64 +185,31 @@ impl Caller {
         } else {
             return Err(anyhow::anyhow!("Invalid from_block"));
         }
-        /* 
-        length = latest - successful
-        to_block = latest
-        while starting block < from_block {
-            to_block = latest - length
-            from_block = to_block - length
-            get logs, add to vec
-        }
-        from-block = starting
-        to-block = previous_to_block
-        get logs, add to vec
-
-        */
-
-        // TODO nova logika, appenda dok ne dode do kraja lol
-        // nema fiksni length, nego svaki unutarnji loop ce izbacivat nesto drukcije. i onda samo appendat 
 
         println!("INITIAL LOOP START");
 
         let mut logs: Vec<Log> = Vec::new();
         // buld up vector here (of all logs)
-        let (initial_logs, successful_from_block) =
-        self.get_logs_safely_inner_loop(&filter, latest_block)?;
-        logs.splice(0..0, initial_logs.into_iter()); //prepends logs
-        println!("got: {} - {}", successful_from_block, latest_block);
-        let length = latest_block - successful_from_block + 1;
-
-        let mut to_block = latest_block;
-        let mut from_block = successful_from_block + 1;
-        println!("INITIAL LOOP END");
-        while starting_block < from_block {
-            
-            to_block -= length;
-            from_block = to_block - length; 
-            
-            println!("ask: {} - {}", from_block, to_block);
-            let mut new_filter = filter.clone();
-            new_filter.block_option = FilterBlockOption::Range {
-                from_block: Some(BlockNumberOrTag::Number(from_block)),
-                to_block: Some(BlockNumberOrTag::Number(to_block)),
-            };
-
-            let (new_logs, new_successful_from_block) =
-                self.get_logs_safely_inner_loop(&new_filter, latest_block)?;
-            println!("got: {} - {}", new_successful_from_block, to_block);
+        let mut flag = true;
+        let mut length;
+        let mut filter = filter.clone();
+        while flag {
+            println!("ask: {:?} - {:?}", filter.block_option.get_from_block(), filter.block_option.get_to_block());
+            let (new_logs, successful_from_block) =
+            self.get_logs_safely_inner_loop(&filter, latest_block)?;
             logs.splice(0..0, new_logs.into_iter()); //prepends logs
+            println!("got: {:?} - {:?}", successful_from_block, filter.block_option.get_from_block());
+            if successful_from_block < starting_block {
+                flag = false;
+            }
+            length = latest_block - successful_from_block + 1;
+            filter.block_option = FilterBlockOption::Range {
+                from_block: Some(BlockNumberOrTag::Number(successful_from_block - length)),
+                to_block: Some(BlockNumberOrTag::Number(successful_from_block - 1)),
+            };
         }
 
-        // Final fetch for the remaining range
-        let mut final_filter = filter.clone();
-        final_filter.block_option = FilterBlockOption::Range {
-            from_block: Some(BlockNumberOrTag::Number(starting_block)),
-            to_block: Some(BlockNumberOrTag::Number(to_block)),
-        };
-
-        let (final_logs, _) = self.get_logs_safely_inner_loop(&final_filter, latest_block)?;
-        logs.splice(0..0, final_logs.into_iter()); //prepends logs
-
+        println!("LOOP END");
         Ok(logs)
     }
 
