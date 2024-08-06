@@ -7,8 +7,8 @@ use kinode_process_lib::{
     println,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap};
-use std::hash::{Hash, Hasher, DefaultHasher};
+use std::collections::HashMap;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::str::FromStr;
 
 /* ABI import */
@@ -47,7 +47,10 @@ impl EthCaller {
         let call = COUNTER::setNumberCall { newNumber: number }.abi_encode();
         match self.caller.send_tx(
             call,
-            &self.contract_addresses.get(&ContractName::Counter).unwrap_or(&"".to_string()),
+            &self
+                .contract_addresses
+                .get(&ContractName::Counter)
+                .unwrap_or(&"".to_string()),
             1500000,
             10000000000,
             300000000,
@@ -64,7 +67,10 @@ impl EthCaller {
         self.caller.send_tx_with_nonce(
             nonce,
             call,
-            &self.contract_addresses.get(&ContractName::Counter).unwrap_or(&"".to_string()),
+            &self
+                .contract_addresses
+                .get(&ContractName::Counter)
+                .unwrap_or(&"".to_string()),
             1500000,
             10000000000,
             300000000,
@@ -78,7 +84,10 @@ impl EthCaller {
         println!("here");
         match self.caller.send_tx(
             call,
-            &self.contract_addresses.get(&ContractName::Counter).unwrap_or(&"".to_string()),
+            &self
+                .contract_addresses
+                .get(&ContractName::Counter)
+                .unwrap_or(&"".to_string()),
             1500000,
             10000000000,
             300000000,
@@ -125,19 +134,16 @@ impl EthCaller {
                 .unwrap(),
             )
             .from_block(from_block)
-            .to_block(BlockNumberOrTag::Latest);
+            .to_block(BlockNumberOrTag::Latest)
+            .event("NumberIncremented(uint256)");
 
         let logs = self.caller.get_logs(&filter)?;
-        let mut result = Vec::new();
+        let mut index: HashMap<u64, U256> = HashMap::new();
         logs.iter().for_each(|log| {
-            if let Ok(decoded) = log.log_decode::<COUNTER::NumberIncremented>() {
-                result.push(decoded);
+            if let Ok(inc) = log.log_decode::<COUNTER::NumberIncremented>() {
+                let COUNTER::NumberIncremented { newNumber } = inc.inner.data;
+                index.insert(log.block_timestamp.unwrap_or_default(), newNumber);
             }
-        });
-        let mut index = HashMap::new();
-        result.iter().for_each(|log| {
-            let COUNTER::NumberIncremented { newNumber } = log.inner.data;
-            index.insert(log.block_timestamp.unwrap_or_default(), newNumber);
         });
         Ok(index)
     }
@@ -145,8 +151,7 @@ impl EthCaller {
     // general methods
     pub fn subscribe_logs(&self, contract_name: ContractName) -> anyhow::Result<()> {
         let filter: Filter = Filter::new().address(
-            EthAddress::from_str(&self.contract_addresses.get(&contract_name).unwrap())
-                .unwrap(),
+            EthAddress::from_str(&self.contract_addresses.get(&contract_name).unwrap()).unwrap(),
         );
 
         let mut hasher: DefaultHasher = DefaultHasher::new();

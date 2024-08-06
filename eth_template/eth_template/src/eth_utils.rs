@@ -165,15 +165,84 @@ impl Caller {
         }
     }
 
-    // TODO outside loop
+    
     /*
     outside loop - once success received, divide by correct number of times
     inner loop - keep trying until first success
      */
     pub fn get_logs_safely(&self, filter: &Filter) -> anyhow::Result<Vec<Log>> {
         let latest_block = self.get_latest_block()?;
+        let mut starting_block: u64;
+        if let FilterBlockOption::Range {
+            from_block,
+            to_block,
+        } = filter.block_option
+        {
+            if let BlockNumberOrTag::Number(from_block) = from_block.unwrap() {
+                starting_block = from_block;
+            } else {
+                return Err(anyhow::anyhow!("Invalid from_block"));
+            }
+        } else {
+            return Err(anyhow::anyhow!("Invalid from_block"));
+        }
+        /* 
+        length = latest - successful
+        to_block = latest
+        while starting block < from_block {
+            to_block = latest - length
+            from_block = to_block - length
+            get logs, add to vec
+        }
+        from-block = starting
+        to-block = previous_to_block
+        get logs, add to vec
+
+        */
+
+        // TODO nova logika, appenda dok ne dode do kraja lol
+        // nema fiksni length, nego svaki unutarnji loop ce izbacivat nesto drukcije. i onda samo appendat 
+
+        println!("INITIAL LOOP START");
+
+        let mut logs: Vec<Log> = Vec::new();
         // buld up vector here (of all logs)
-        let (logs, successful_from_block) = self.get_logs_safely_inner_loop(&filter, latest_block)?;
+        let (initial_logs, successful_from_block) =
+        self.get_logs_safely_inner_loop(&filter, latest_block)?;
+        logs.splice(0..0, initial_logs.into_iter()); //prepends logs
+        println!("got: {} - {}", successful_from_block, latest_block);
+        let length = latest_block - successful_from_block + 1;
+
+        let mut to_block = latest_block;
+        let mut from_block = successful_from_block + 1;
+        println!("INITIAL LOOP END");
+        while starting_block < from_block {
+            
+            to_block -= length;
+            from_block = to_block - length; 
+            
+            println!("ask: {} - {}", from_block, to_block);
+            let mut new_filter = filter.clone();
+            new_filter.block_option = FilterBlockOption::Range {
+                from_block: Some(BlockNumberOrTag::Number(from_block)),
+                to_block: Some(BlockNumberOrTag::Number(to_block)),
+            };
+
+            let (new_logs, new_successful_from_block) =
+                self.get_logs_safely_inner_loop(&new_filter, latest_block)?;
+            println!("got: {} - {}", new_successful_from_block, to_block);
+            logs.splice(0..0, new_logs.into_iter()); //prepends logs
+        }
+
+        // Final fetch for the remaining range
+        let mut final_filter = filter.clone();
+        final_filter.block_option = FilterBlockOption::Range {
+            from_block: Some(BlockNumberOrTag::Number(starting_block)),
+            to_block: Some(BlockNumberOrTag::Number(to_block)),
+        };
+
+        let (final_logs, _) = self.get_logs_safely_inner_loop(&final_filter, latest_block)?;
+        logs.splice(0..0, final_logs.into_iter()); //prepends logs
 
         Ok(logs)
     }
@@ -189,28 +258,26 @@ impl Caller {
             FilterBlockOption::Range {
                 from_block,
                 to_block,
-            } => {
-                match self.provider.get_logs(&filter) {
-                    Ok(logs) => {
-                        println!("success from block: {:?}", from_block);
-                        if let BlockNumberOrTag::Number(from_block) = from_block.unwrap() {
-                            return Ok((logs, from_block));
-                        } else {
-                            return Err(anyhow::anyhow!("Invalid from_block"));
-                        }
-                    }
-                    Err(e) => {
-                        println!("error fetching logs: {:?}", e);
-                        println!("when trying block: {:?}", from_block);
-                        if let BlockNumberOrTag::Number(from_block) = from_block.unwrap() {
-                            let filter = filter.clone().from_block((from_block + latest_block) / 2);
-                            self.get_logs_safely_inner_loop(&filter, latest_block)
-                        } else {
-                            return Err(anyhow::anyhow!("Invalid from_block"));
-                        }
+            } => match self.provider.get_logs(&filter) {
+                Ok(logs) => {
+                    // println!("success from block: {:?}", from_block);
+                    if let BlockNumberOrTag::Number(from_block) = from_block.unwrap() {
+                        return Ok((logs, from_block));
+                    } else {
+                        return Err(anyhow::anyhow!("Invalid from_block"));
                     }
                 }
-            }
+                Err(e) => {
+                    // println!("error fetching logs: {:?}", e);
+                    // println!("when trying block: {:?}", from_block);
+                    if let BlockNumberOrTag::Number(from_block) = from_block.unwrap() {
+                        let filter = filter.clone().from_block((from_block + latest_block) / 2);
+                        self.get_logs_safely_inner_loop(&filter, latest_block)
+                    } else {
+                        return Err(anyhow::anyhow!("Invalid from_block"));
+                    }
+                }
+            },
             FilterBlockOption::AtBlockHash(block_hash) => match self.provider.get_logs(&filter) {
                 Ok(logs) => Ok((logs, latest_block)),
                 Err(e) => {
