@@ -171,19 +171,17 @@ impl Caller {
      */
     pub fn get_logs_safely(&self, filter: &Filter) -> anyhow::Result<Vec<Log>> {
         let latest_block = self.get_latest_block()?;
-        let mut starting_block: u64;
+        let starting_block: u64;
+
+        // annoying unwrapping
         if let FilterBlockOption::Range {
-            from_block,
-            to_block,
+            from_block: Some(BlockNumberOrTag::Number(from_block)),
+            ..
         } = filter.block_option
         {
-            if let BlockNumberOrTag::Number(from_block) = from_block.unwrap() {
-                starting_block = from_block;
-            } else {
-                return Err(anyhow::anyhow!("Invalid from_block 2"));
-            }
+            starting_block = from_block;
         } else {
-            return Err(anyhow::anyhow!("Invalid from_block 3"));
+            return Err(anyhow::anyhow!("Please use FilterBlockOption::Range"));
         }
 
         println!("INITIAL LOOP START");
@@ -200,8 +198,9 @@ impl Caller {
                 filter.block_option.get_to_block()
             );
             let (new_logs, successful_from_block, mut successful_to_block) =
-            self.get_logs_safely_inner_loop(&filter, None)?;
+                self.get_logs_safely_inner_loop(&filter, None)?;
             logs.splice(0..0, new_logs.into_iter()); //prepends logs
+            
             println!(
                 "got: {:?} - {:?}",
                 successful_from_block, successful_to_block
@@ -223,7 +222,7 @@ impl Caller {
                     to_block: Some(BlockNumberOrTag::Number(successful_from_block - 1)),
                 };
             } else {
-                return Err(anyhow::anyhow!("Invalid from_block 1"));
+                return Err(anyhow::anyhow!("Invalid inner loop output"));
             }
         }
 
@@ -244,55 +243,45 @@ impl Caller {
         filter: &Filter,
         latest_block: Option<u64>,
     ) -> anyhow::Result<(Vec<Log>, BlockNumberOrTag, BlockNumberOrTag)> {
+        // annoying unwrapping
+
+        let from: u64;
+        let to: BlockNumberOrTag;
+
         if let FilterBlockOption::Range {
-            from_block,
-            to_block,
+            from_block: Some(BlockNumberOrTag::Number(from_block)),
+            to_block: Some(to_block),
         } = filter.block_option
         {
-            match self.provider.get_logs(&filter) {
-                Ok(logs) => {
-                    println!("success from - to: {:?} - {:?}", from_block, to_block);
-                    return Ok((logs, from_block.unwrap(), to_block.unwrap()));
-                }
-                Err(e) => {
-                    // println!("error fetching logs: {:?}", e);
-                    // println!("when trying block: {:?}", from_block);
-                    let latest_block = latest_block.unwrap_or(self.get_latest_block()?);
+            from = from_block;
+            to = to_block;
+        } else {
+            return Err(anyhow::anyhow!("Please use FilterBlockOption::Range"));
+        }
 
-                    if let BlockNumberOrTag::Number(from_block) = from_block.unwrap() {
-                        match to_block.unwrap() {
-                            BlockNumberOrTag::Latest => {
-                                let filter =
-                                    filter.clone().from_block((from_block + latest_block) / 2);
-                                println!(
-                                    "trying from - to: {:?} - {:?}",
-                                    from_block,
-                                    filter.get_to_block()
-                                );
-                                self.get_logs_safely_inner_loop(&filter, Some(latest_block))
-                            }
-                            BlockNumberOrTag::Number(to_block) => {
-                                let filter = filter.clone().from_block((from_block + to_block) / 2);
-                                println!(
-                                    "trying from - to: {:?} - {:?}",
-                                    from_block,
-                                    filter.get_to_block()
-                                );
-                                self.get_logs_safely_inner_loop(&filter, Some(latest_block))
-                            }
-                            _ => {
-                                return Err(anyhow::anyhow!("Please use BlockNumberOrTag::Number or BlockNumberOrTag::Latest for to_block"));
-                            }
-                        }
-                    } else {
-                        return Err(anyhow::anyhow!(
-                            "Please use BlockNumberOrTag::Number for from_block"
-                        ));
+        match self.provider.get_logs(&filter) {
+            Ok(logs) => {
+                println!("success from - to: {:?} - {:?}", from, to);
+                return Ok((logs, BlockNumberOrTag::Number(from), to));
+            }
+            Err(_e) => {
+                let latest_block = latest_block.unwrap_or(self.get_latest_block()?);
+                match to {
+                    BlockNumberOrTag::Latest => {
+                        let filter = filter.clone().from_block((from + latest_block) / 2);
+                        println!("trying from - to: {:?} - {:?}", from, filter.get_to_block());
+                        self.get_logs_safely_inner_loop(&filter, Some(latest_block))
+                    }
+                    BlockNumberOrTag::Number(to) => {
+                        let filter = filter.clone().from_block((from + to) / 2);
+                        println!("trying from - to: {:?} - {:?}", from, filter.get_to_block());
+                        self.get_logs_safely_inner_loop(&filter, Some(latest_block))
+                    }
+                    _ => {
+                        return Err(anyhow::anyhow!("Please use BlockNumberOrTag::Number or BlockNumberOrTag::Latest for to_block"));
                     }
                 }
             }
-        } else {
-            Err(anyhow::anyhow!("Please use FilterBlockOption::Range"))
         }
     }
 

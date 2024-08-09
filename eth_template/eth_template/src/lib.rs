@@ -9,8 +9,8 @@ use kinode_process_lib::http::{bind_ws_path, send_ws_push, WsMessageType};
 use kinode_process_lib::{
     await_message, call_init,
     eth::{
-        Address as EthAddress, EthConfigAction, EthSubResult, Filter, NodeOrRpcUrl, ProviderConfig,
-        SubscriptionResult, BlockNumberOrTag
+        Address as EthAddress, BlockNumberOrTag, EthConfigAction, EthSubResult, Filter,
+        NodeOrRpcUrl, ProviderConfig, SubscriptionResult,
     },
     get_blob,
     http::{self},
@@ -81,7 +81,7 @@ lazy_static! {
         };
         println!("NEW USDC contract address: {}", contract_address);
         contract_address
-    }; 
+    };
 }
 
 fn initialize_addresses() -> HashMap<ContractName, String> {
@@ -174,6 +174,7 @@ fn handle_terminal_message(
             return Ok(());
         }
     };
+    println!("action: {:#?}", action);
 
     match action {
         Action::EncryptWallet {
@@ -263,7 +264,7 @@ fn handle_terminal_message(
                 nonce = result.1;
             }
         }
-        Action::GetLogs(from_block) => {
+        Action::GetIncrementLogs(from_block) => {
             if let None = eth_caller {
                 println!("eth caller not instantied. please decrypt wallet first.");
                 return Ok(());
@@ -295,7 +296,8 @@ fn handle_terminal_message(
 
             eth_caller.unsubscribe_increment_logs(ContractName::Counter)?;
         }
-        Action::GetUsdcLogs(from_block) => {
+        Action::GetUsdcLogs{from_block, to_block} => {
+            println!("here");
             if let None = eth_caller {
                 println!("eth caller not instantied. please decrypt wallet first.");
                 return Ok(());
@@ -313,10 +315,9 @@ fn handle_terminal_message(
                     .unwrap(),
                 )
                 .from_block(from_block)
-                // .to_block(BlockNumberOrTag::Latest);
-                .to_block(BlockNumberOrTag::Latest);
-                // .event("Transfer(address indexed _from, address indexed _to, uint256 _value)");
-                //.topic1(user_address); 
+                .to_block(to_block);
+            // .event("Transfer(address indexed _from, address indexed _to, uint256 _value)");
+            //.topic1(user_address);
             let logs = eth_caller.caller.get_logs_safely(&filter)?;
             println!("logs: {:#?}", logs.len());
         }

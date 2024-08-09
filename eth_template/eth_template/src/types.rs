@@ -1,8 +1,9 @@
 use alloy_primitives::U256;
 use serde::{Serialize, Deserialize};
-use kinode_process_lib::{Address, get_state, set_state};
+use kinode_process_lib::{Address, get_state, set_state, eth::BlockNumberOrTag};
 use std::collections::HashMap;
 use alloy_signer::{LocalWallet, Signer};
+
 
 // from UI to backend
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -22,11 +23,11 @@ pub enum WsUpdate {
 pub enum Action {
     EncryptWallet {private_key: Option<String>, password: String}, // if none, will use decrypted wallet key
     DecryptWallet(String),
-    GetLogs(u64), // from block
+    GetIncrementLogs(u64), // from block
     ManyIncrements(u64),
     SubscribeIncrementLogs,
     UnsubscribeIncrementLogs,
-    GetUsdcLogs(u64)
+    GetUsdcLogs{from_block: u64, to_block: u64}// from_block, to_block
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
