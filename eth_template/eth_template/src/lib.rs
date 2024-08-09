@@ -313,8 +313,9 @@ fn handle_terminal_message(
                     .unwrap(),
                 )
                 .from_block(from_block)
-                .to_block(BlockNumberOrTag::Latest)
-                .event("Transfer(address indexed _from, address indexed _to, uint256 _value)");
+                // .to_block(BlockNumberOrTag::Latest);
+                .to_block(BlockNumberOrTag::Latest);
+                // .event("Transfer(address indexed _from, address indexed _to, uint256 _value)");
                 //.topic1(user_address); 
             let logs = eth_caller.caller.get_logs_safely(&filter)?;
             println!("logs: {:#?}", logs.len());
