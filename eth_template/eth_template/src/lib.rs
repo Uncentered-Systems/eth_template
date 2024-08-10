@@ -175,8 +175,7 @@ fn handle_terminal_message(
             return Ok(());
         }
     };
-    println!("action: {:#?}", action);
-
+    
     match action {
         Action::EncryptWallet {
             private_key,

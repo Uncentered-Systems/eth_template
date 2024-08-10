@@ -63,10 +63,34 @@ For anvil, add the following into the list:
 TODO - figure out why [this code](./eth_template/eth_template/src/lib.rs#L414-L423) isn't able to set eth providers programmatically
 
 ### Foundry Wallet
-cast wallet import wallet-name --interactive
-specific names
-then when running ./deploy, you will be asked for a password
+
+Set up your foundry wallet. 
+In place of wallet-name, use `anvil`, `optimism`, `mainnet`, or `sepolia`, to insert the private key for each of these, respectively.
+These names are hardcoded into the contract `deploy.sh` script.
+When running `./deploy.sh`, you will be asked for the password you input here.
+
+```bash
+cast wallet import <wallet-name> --interactive
+```
+
 ### Kinode Wallet
+
+Depending on the current chain_id the process is compiled with (as specified in .env), the terminal commands shown below will store the key specifically for that chain_id.
+
+To store the key encrypted in state, use:
+
+`m our@eth_template:eth_template:astronaut.os '{"EncryptWallet": {"private_key": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", "password": "some-password"}}'`
+
+To be able to interact with the contract, you need to decrypt the key.
+Be careful, it will be stored in your kinode state unencrypted.
+
+`m our@eth_template:eth_template:astronaut.os '{"DecryptWallet": "some-password"}'`
+
+
+After you're done with using it, re-encrypt the key.
+
+`m our@eth_template:eth_template:astronaut.os '{"EncryptWallet": {"password": "some-password"}}'`
+
 ## Increment Contract
 
 Specify the current chain id and it's rpc url in the `.env` file.
@@ -74,19 +98,6 @@ Then:
 `./deploy.sh`
 
 Copy the contract address from the output of the deploy script and paste it into the VITE_ANVIL_CONTRACT_ADDRESS field in the `.env` file.
-
-### Wallet
-
-- stores keys based on current chain id specified in .env setup
-
-foudnry keys usage
-
-#### Terminal
-
-    - EncryptWallet {private_key: Option<String>, password: String}, // if none, will use decrypted wallet key
-    `m our@eth_template:eth_template:astronaut.os '{"EncryptWallet": {"private_key": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", "password": "pass"}}'`
-    - DecryptWallet(String),
-    `m our@eth_template:eth_template:astronaut.os '{"DecryptWallet": "pass"}'`
 
 ### anvil and metamask
 
