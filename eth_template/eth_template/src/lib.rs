@@ -4,7 +4,8 @@ use lazy_static::lazy_static;
 use std::env;
 use std::io::Cursor;
 
-use crate::eth_caller::COUNTER;
+use crate::eth_caller::COUNTER::new;
+use crate::eth_caller::{COUNTER, USDC};
 use kinode_process_lib::http::{bind_ws_path, send_ws_push, WsMessageType};
 use kinode_process_lib::{
     await_message, call_init,
@@ -20,7 +21,7 @@ mod encryption;
 mod eth_utils;
 use eth_utils::Caller;
 mod eth_caller;
-use alloy_primitives::{Signature, U256};
+use alloy_primitives::{Signature, U256, B256};
 use alloy_signer::{LocalWallet, Signer};
 use eth_caller::{ContractName, EthCaller};
 mod types;
@@ -296,8 +297,10 @@ fn handle_terminal_message(
 
             eth_caller.unsubscribe_increment_logs(ContractName::Counter)?;
         }
-        Action::GetUsdcLogs{from_block, to_block} => {
-            println!("here");
+        Action::GetUsdcLogs {
+            from_block,
+            to_block,
+        } => {
             if let None = eth_caller {
                 println!("eth caller not instantied. please decrypt wallet first.");
                 return Ok(());
@@ -315,11 +318,17 @@ fn handle_terminal_message(
                     .unwrap(),
                 )
                 .from_block(from_block)
-                .to_block(to_block);
-            // .event("Transfer(address indexed _from, address indexed _to, uint256 _value)");
-            //.topic1(user_address);
+                .to_block(to_block)
+                .event("Transfer(address,address,uint256)");
+                // .topic3(B256::ZERO);
             let logs = eth_caller.caller.get_logs_safely(&filter)?;
-            println!("logs: {:#?}", logs.len());
+
+            logs.iter().for_each(|log| {
+                if let Ok(transfer) = log.log_decode::<USDC::Transfer>() {
+                    println!("{:#?}", transfer.inner.data);
+                    // let USDC::Transfer { .. } = inc.inner.data;
+                }
+            });
         }
     }
     return Ok(());

@@ -201,10 +201,6 @@ impl Caller {
                 self.get_logs_safely_inner_loop(&filter, None)?;
             logs.splice(0..0, new_logs.into_iter()); //prepends logs
             
-            println!(
-                "got: {:?} - {:?}",
-                successful_from_block, successful_to_block
-            );
             if let BlockNumberOrTag::Latest = successful_to_block {
                 successful_to_block = BlockNumberOrTag::Number(latest_block);
             }
@@ -213,6 +209,10 @@ impl Caller {
                 BlockNumberOrTag::Number(successful_to_block),
             ) = (successful_from_block, successful_to_block)
             {
+                println!(
+                    "got: {:?} - {:?}",
+                    successful_from_block, successful_to_block
+                );
                 if successful_from_block <= starting_block {
                     flag = false;
                 }
