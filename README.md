@@ -117,11 +117,16 @@ Then you can talk to Anvil directly from Metamask.
 
 There are a few other actions for demo purposes which can be accessed from the terminal.
 
-    GetIncrementLogs(u64), // from block
-    - `m our@eth_template:eth_template:astronaut.os '{"GetIncrementLogs": 0}'`
-    ManyIncrements(u64),
+#### Get Increment Logs
+
+Access all logs of events of type "NumberIncremented" and store them to local index.
+
+`m our@eth_template:eth_template:astronaut.os '{"GetIncrementLogs": 0}'`
+
+
     SubscribeIncrementLogs,
     UnsubscribeIncrementLogs,
+    ManyIncrements(u64),
 
 - TODO
 as im writing this, make sure to use get_logs_safely instead of get_logs in get_increment_logs. test that it works correctly.
@@ -138,4 +143,6 @@ when using anvil from metamask, and the transactions stay pending, do the follow
 
 ## Getting Logs Safely
 
-    GetUsdcLogs{from_block: u64, to_block: u64}// from_block, to_block
+- GetUsdcLogs{from_block: u64, to_block: u64}// from_block, to_block
+poruke s markusom - topics example
+

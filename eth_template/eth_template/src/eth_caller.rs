@@ -136,7 +136,7 @@ impl EthCaller {
             .to_block(BlockNumberOrTag::Latest)
             .event("NumberIncremented(uint256)");
 
-        let logs = self.caller.get_logs(&filter)?;
+        let logs = self.caller.get_logs_safely(&filter)?;
         let mut index: HashMap<u64, U256> = HashMap::new();
         logs.iter().for_each(|log| {
             if let Ok(inc) = log.log_decode::<COUNTER::NumberIncremented>() {
