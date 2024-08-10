@@ -60,7 +60,7 @@ For anvil, add the following into the list:
 }
 ```
 
-TODO - figure out why [this code](./eth_template/eth_template/src/lib.rs#L414-L423) isn't able to set eth providers programmatically
+TODO - figure out why [this code](./eth_template/eth_template/src/lib.rs#L414-L423) isn't able to set eth providers programmatically.
 
 ### Foundry Wallet
 
@@ -86,44 +86,55 @@ Be careful, it will be stored in your kinode state unencrypted.
 
 `m our@eth_template:eth_template:astronaut.os '{"DecryptWallet": "some-password"}'`
 
-
 After you're done with using it, re-encrypt the key.
 
 `m our@eth_template:eth_template:astronaut.os '{"EncryptWallet": {"password": "some-password"}}'`
 
-## Increment Contract
+## Counter Contract
 
-Specify the current chain id and it's rpc url in the `.env` file.
+Specify the current chain id and its rpc url in the `.env` file.
 Then:
 `./deploy.sh`
 
 Copy the contract address from the output of the deploy script and paste it into the VITE_ANVIL_CONTRACT_ADDRESS field in the `.env` file.
+[Recompile the process and restart the server.](#env)
 
-### anvil and metamask
+### Interacting with Counter Contract
 
-when using anvil from metamask, and the transactions stay pending, do the following:
+From the UI, you can interact with the counter contract in 2 ways.
 
-- delete anvil network from metamask and re add it
-- delete tx history tab in metamask (advanced settings)
+#### 1. UI - BE - Chain 
 
-- TODO
-as im writing this, make sure to use get_logs_safely instead of get_logs in get_increment_logs. test that it works correctly.
+Send an action to the backend from the UI via WS, which will then make a call to the chain.
 
-### Actions
+#### 2. Metamask - Chain
 
-#### UI / WS
+Make sure that your connected Metamask account is your Anvil account on the Anvil network.
+Click "Connect Metamask".
+Then you can talk to Anvil directly from Metamask.
 
-    - increment
-    - set number
-    - number
+### Other Actions
 
-#### Terminal
+There are a few other actions for demo purposes which can be accessed from the terminal.
 
     GetIncrementLogs(u64), // from block
     - `m our@eth_template:eth_template:astronaut.os '{"GetIncrementLogs": 0}'`
     ManyIncrements(u64),
     SubscribeIncrementLogs,
     UnsubscribeIncrementLogs,
+
+- TODO
+as im writing this, make sure to use get_logs_safely instead of get_logs in get_increment_logs. test that it works correctly.
+
+### Metamask and Anvil
+
+http://localhost:8545
+31337
+
+when using anvil from metamask, and the transactions stay pending, do the following:
+
+- delete anvil network from metamask and re add it
+- delete tx history tab in metamask (advanced settings)
 
 ## Getting Logs Safely
 
