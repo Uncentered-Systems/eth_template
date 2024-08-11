@@ -1,4 +1,4 @@
-use crate::eth_utils::Caller;
+use crate::caller::Caller;
 use crate::CURRENT_CHAIN_ID;
 use alloy_primitives::{FixedBytes, U256};
 use alloy_sol_types::{sol, SolCall};
@@ -33,12 +33,12 @@ pub enum ContractName {
     Counter,
 }
 
-pub struct EthCaller {
+pub struct ContractCaller {
     pub caller: Caller,
     pub contract_addresses: HashMap<ContractName, String>,
 }
 
-impl EthCaller {
+impl ContractCaller {
     // usdc methods
 
     // counter methods

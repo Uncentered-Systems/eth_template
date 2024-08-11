@@ -90,6 +90,16 @@ After you're done with using it, re-encrypt the key.
 
 `m our@eth_template:eth_template:astronaut.os '{"EncryptWallet": {"password": "some-password"}}'`
 
+### Metamask and Anvil
+
+Add Anvil network to Metamask. Use `http://localhost:8545` as the RPC URL and `31337` as the chain ID.
+
+Sometimes, the transactions from Metamask on Anvil will stay pending indefinitely.
+In that case, do the following:
+
+- Delete Anvil network from Metamask and re-add it.
+- Clear activity tab data in Metamask (Settings -> Advanced).
+
 ## Counter Contract
 
 Specify the current chain id and its rpc url in the `.env` file.
@@ -119,30 +129,50 @@ There are a few other actions for demo purposes which can be accessed from the t
 
 #### Get Increment Logs
 
-Access all logs of events of type "NumberIncremented" and store them to local index.
+Get all logs of events of type "NumberIncremented" and store them to local index. Starting from block 0. (This is fine if you are using anvil).
 
 `m our@eth_template:eth_template:astronaut.os '{"GetIncrementLogs": 0}'`
 
+Subscribe to logs of events of type "NumberIncremented" and store them to local index. After subscribing, when you make an increment, the index will be updated.
 
-    SubscribeIncrementLogs,
-    UnsubscribeIncrementLogs,
-    ManyIncrements(u64),
+`m our@eth_template:eth_template:astronaut.os "SubscribeIncrementLogs"`
 
-- TODO
-as im writing this, make sure to use get_logs_safely instead of get_logs in get_increment_logs. test that it works correctly.
+Unsubscribe from logs of events of type "NumberIncremented".
 
-### Metamask and Anvil
+`m our@eth_template:eth_template:astronaut.os "UnsubscribeIncrementLogs"`
 
-http://localhost:8545
-31337
+Make many increments; a convenience command for testing.
 
-when using anvil from metamask, and the transactions stay pending, do the following:
+`m our@eth_template:eth_template:astronaut.os '{"ManyIncrements": 5}'`
 
-- delete anvil network from metamask and re add it
-- delete tx history tab in metamask (advanced settings)
+#### Getting Logs Safely
 
-## Getting Logs Safely
+To demonstrate getting a large amount of logs safely, we get logs from USDC contract on OP Mainnet.
 
-- GetUsdcLogs{from_block: u64, to_block: u64}// from_block, to_block
-poruke s markusom - topics example
+In `.env`, change VITE_CURRENT_CHAIN_ID to 10 and run recompile the package.
 
+`m our@eth_template:eth_template:astronaut.os '{"GetUsdcLogs": {"from_block": 123865000, "to_block": 123865806}}'`
+
+## Code Explanation
+
+### `sol-contracts`
+
+`sol-contracts` contains all the usual foundry code for deployment, testing, etc., but also, the code for integration with the Kinode package is included.
+
+`build.sh` copies the abi into the ui and into the rust backend, which they both use to interact with the contract.
+
+`deploy.sh` is the script that will deploy the contract to the chain specified in .env.
+
+### `eth_template`
+
+
+#### Caller struct in `caller.rs`
+generalizes struct for interacting with contract.
+implements methods which are contract-agnostic, and will be used by contractcaller
+
+#### ContractCaller struct in `contract_caller.rs`
+takes caller struct and implements specific methods for interacting with each contract.
+
+#### Getting Logs Safely Algorithm
+
+### WebSocket Usage

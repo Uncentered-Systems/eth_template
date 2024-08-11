@@ -4,8 +4,8 @@ use lazy_static::lazy_static;
 use std::env;
 use std::io::Cursor;
 
-use crate::eth_caller::COUNTER::new;
-use crate::eth_caller::{COUNTER, USDC};
+use crate::contract_caller::COUNTER::new;
+use crate::contract_caller::{COUNTER, USDC};
 use kinode_process_lib::http::{bind_ws_path, send_ws_push, WsMessageType};
 use kinode_process_lib::{
     await_message, call_init,
@@ -18,12 +18,12 @@ use kinode_process_lib::{
     println, Address, LazyLoadBlob, Message, Request, Response,
 };
 mod encryption;
-mod eth_utils;
-use eth_utils::Caller;
-mod eth_caller;
-use alloy_primitives::{Signature, U256, B256};
+mod caller;
+use caller::Caller;
+mod contract_caller;
+use alloy_primitives::{keccak256, Signature, B256, U256};
 use alloy_signer::{LocalWallet, Signer};
-use eth_caller::{ContractName, EthCaller};
+use contract_caller::{ContractName, ContractCaller};
 mod types;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -96,7 +96,7 @@ fn handle_http_request(
     state: &mut State,
     ws_channel_id: &mut Option<u32>,
     message: &Message,
-    eth_caller: &mut Option<EthCaller>,
+    eth_caller: &mut Option<ContractCaller>,
 ) -> anyhow::Result<()> {
     let our_http_request = serde_json::from_slice::<http::HttpServerRequest>(message.body())?;
     match our_http_request {
@@ -162,7 +162,7 @@ fn handle_http_request(
 // used for eth contract testing
 fn handle_terminal_message(
     state: &mut State,
-    eth_caller: &mut Option<EthCaller>,
+    eth_caller: &mut Option<ContractCaller>,
     ws_channel_id: &mut Option<u32>,
     message: &Message,
 ) -> anyhow::Result<()> {
@@ -175,7 +175,7 @@ fn handle_terminal_message(
             return Ok(());
         }
     };
-    
+
     match action {
         Action::EncryptWallet {
             private_key,
@@ -231,7 +231,7 @@ fn handle_terminal_message(
                             if let Some(caller) =
                                 Caller::new(*CURRENT_CHAIN_ID, wallet.private_key.as_str())
                             {
-                                *eth_caller = Some(EthCaller {
+                                *eth_caller = Some(ContractCaller {
                                     caller: caller,
                                     contract_addresses: initialize_addresses(),
                                 });
@@ -304,25 +304,31 @@ fn handle_terminal_message(
                 println!("eth caller not instantied. please decrypt wallet first.");
                 return Ok(());
             }
-            let eth_caller: &EthCaller = eth_caller.as_ref().unwrap();
-
+            let eth_caller: &ContractCaller = eth_caller.as_ref().unwrap();
+            let address = EthAddress::from_str(
+                &eth_caller
+                    .contract_addresses
+                    .get(&ContractName::Usdc)
+                    .unwrap()
+            )
+            .unwrap();
             let filter: Filter = Filter::new()
-                .address(
-                    EthAddress::from_str(
-                        &eth_caller
-                            .contract_addresses
-                            .get(&ContractName::Usdc)
-                            .unwrap(),
-                    )
-                    .unwrap(),
-                )
+                .address(address)
                 .from_block(from_block)
                 .to_block(to_block)
-                .event("Transfer(address,address,uint256)");
-                // .topic3(B256::ZERO);
+                .event("Transfer(address indexed _from,address indexed _to,uint256 _value)")
+                .topic1(keccak256("0xC8373EDFaD6d5C5f600b6b2507F78431C5271fF5".as_bytes()));
+
+
+
+                // .topic1(keccak256("0xC8373EDFaD6d5C5f600b6b2507F78431C5271fF5".as_bytes()));
+            // let call = COUNTER::setNumberCall { newNumber: number }.abi_encode();
+            // USDC::Transfer {from:"0xC8373EDFaD6d5C5f600b6b2507F78431C5271fF5",  ..}.abi_encode();
+
             let logs = eth_caller.caller.get_logs_safely(&filter)?;
 
             logs.iter().for_each(|log| {
+                println!("log: {:#?}", log);
                 if let Ok(transfer) = log.log_decode::<USDC::Transfer>() {
                     println!("{:#?}", transfer.inner.data);
                     // let USDC::Transfer { .. } = inc.inner.data;
@@ -335,7 +341,7 @@ fn handle_terminal_message(
 
 fn handle_eth_message(
     state: &mut State,
-    eth_caller: &mut Option<EthCaller>,
+    eth_caller: &mut Option<ContractCaller>,
     message: &Message,
 ) -> anyhow::Result<()> {
     let eth_result = match serde_json::from_slice::<EthSubResult>(&message.body()) {
@@ -351,7 +357,7 @@ fn handle_eth_message(
     } else {
         match eth_result.unwrap().result {
             SubscriptionResult::Log(log) => {
-                println!("log: {:#?}", log);
+                // println!("log: {:#?}", log);
                 if let Ok(decoded) = log.log_decode::<COUNTER::NumberIncremented>() {
                     state.increment_log_index.insert(
                         log.block_timestamp.unwrap_or_default(),
@@ -369,7 +375,7 @@ fn handle_eth_message(
 
 fn handle_message(
     state: &mut State,
-    eth_caller: &mut Option<EthCaller>,
+    eth_caller: &mut Option<ContractCaller>,
     ws_channel_id: &mut Option<u32>,
 ) -> anyhow::Result<()> {
     let message = await_message()?;
@@ -420,9 +426,9 @@ fn init(our: Address) {
             .unwrap(),
         )
         .send();
-    let mut eth_caller: Option<EthCaller> = None;
+    let mut eth_caller: Option<ContractCaller> = None;
     if let Some(PrivateKey::Decrypted(wallet)) = state.wallets.get(&CURRENT_CHAIN_ID) {
-        eth_caller = Some(EthCaller {
+        eth_caller = Some(ContractCaller {
             caller: Caller::new(*CURRENT_CHAIN_ID, &wallet.private_key).unwrap(),
             contract_addresses: initialize_addresses(),
         });
