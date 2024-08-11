@@ -18,13 +18,13 @@ use kinode_process_lib::{
     http::{self},
     println, Address, LazyLoadBlob, Message, Request, Response,
 };
-mod encryption;
 mod caller;
+mod encryption;
 use caller::Caller;
 mod contract_caller;
-use alloy_primitives::{keccak256, Signature, B256, U256, FixedBytes};
+use alloy_primitives::{keccak256, FixedBytes, Signature, B256, U256};
 use alloy_signer::{LocalWallet, Signer};
-use contract_caller::{ContractName, ContractCaller};
+use contract_caller::{ContractCaller, ContractName};
 mod types;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -310,15 +310,16 @@ fn handle_terminal_message(
                 &eth_caller
                     .contract_addresses
                     .get(&ContractName::Usdc)
-                    .unwrap()
+                    .unwrap(),
             )
             .unwrap();
 
-            let sender_address = EthAddress::from_str("0xC8373EDFaD6d5C5f600b6b2507F78431C5271fF5").unwrap();
+            let sender_address =
+                EthAddress::from_str("0xC8373EDFaD6d5C5f600b6b2507F78431C5271fF5").unwrap();
             let mut sender_topic_bytes = [0u8; 32];
             sender_topic_bytes[12..].copy_from_slice(&sender_address.to_vec());
             let sender_topic: FixedBytes<32> = FixedBytes::from_slice(&sender_topic_bytes);
-            
+
             let filter: Filter = Filter::new()
                 .address(address)
                 .from_block(from_block)
@@ -327,7 +328,7 @@ fn handle_terminal_message(
                 .topic1(sender_topic);
 
             let start = Instant::now();
-            let logs = eth_caller.caller.get_logs_safely_linear(&filter, 2000)?;
+            let logs = eth_caller.caller.get_logs_safely_binary_search(&filter)?;
             let duration = start.elapsed();
             println!("Time elapsed: {:?}", duration);
 

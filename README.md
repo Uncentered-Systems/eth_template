@@ -196,25 +196,42 @@ Example filter from `GetUsdcLogs` action:
         &eth_caller.contract_addresses.get(&ContractName::Usdc).unwrap()
     ).unwrap();
 
+    let sender_address = EthAddress::from_str("0xC8373EDFaD6d5C5f600b6b2507F78431C5271fF5").unwrap();
+    let mut sender_topic_bytes = [0u8; 32];
+    sender_topic_bytes[12..].copy_from_slice(&sender_address.to_vec());
+    let sender_topic: FixedBytes<32> = FixedBytes::from_slice(&sender_topic_bytes);
+
     let filter: Filter = Filter::new()
         .address(address)
         .from_block(from_block)
         .to_block(to_block)
         .event("Transfer(address,address,uint256)")
+        .topic1(sender_topic);
 ```
 
 `address` specifies the address of the contract from which we are fetching logs.
-
 `from_block` and `to_block` specify the desired range.
 
-`event` specifies the event type.
-TODO more detail on event and topic. Indexed etc.
+`event` specifies what type of event we are fetching, as defined in the ABI.
+`topic1`, `topic2`, `topic3` would in this example refer to `address` (from), `address` (to), and `uint256` (value) in the event.
+`topic1`, as shown in the code, is used to filter for events where `address` (from) is equal to `sender_address`.
+
+All arguments in the filter are optional, but it is recommended to always use `address`, `from_block`, and `to_block`.
+
 
 #### Getting Logs Safely
 
-`caller.get_logs_safely_linear()` allows getting an arbitrary amount of logs.
+`get_logs_safely` functions allow for getting an arbitrary amount of logs.
+If the chunk size is too large for any subset of the block range, they will retry with a halved chunk size, thus making getting logs safe.
+It is recommended to use `get_logs_safely_binary_search()` for most cases.
+
+`caller.get_logs_safely_binary_search()`
+
+It approximates the largest amount that can be fetched at once by trial and error, and then recursively fetches logs in the requested range until the entire range has been fetched.
+
+`caller.get_logs_safely_linear()`
+
 It takes a chunk size, and then recursively fetches chunks of logs in the requested range until the entire range has been fetched.
-If the chunk size is too large for any subset of the block range, it will retry with a halved chunk size, thus making getting logs safe.
 
 To specify a range, use a `Filter`.
 `get_logs_safely_linear` only supports a `Filter` which has:

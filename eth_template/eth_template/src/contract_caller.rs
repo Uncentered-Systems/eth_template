@@ -136,7 +136,7 @@ impl ContractCaller {
             .to_block(BlockNumberOrTag::Latest)
             .event("NumberIncremented(uint256)");
 
-        let logs = self.caller.get_logs_safely_linear(&filter, 2000)?;
+        let logs = self.caller.get_logs_safely_binary_search(&filter)?;
         let mut index: HashMap<u64, U256> = HashMap::new();
         logs.iter().for_each(|log| {
             if let Ok(inc) = log.log_decode::<COUNTER::NumberIncremented>() {
@@ -160,11 +160,11 @@ impl ContractCaller {
 
     pub fn unsubscribe_increment_logs(&self, contract_name: ContractName) -> anyhow::Result<()> {
         let filter: Filter = Filter::new()
-        .address(
-            EthAddress::from_str(&self.contract_addresses.get(&contract_name).unwrap())
-                .unwrap(),
-        )
-        .event("NumberIncremented(uint256)");
+            .address(
+                EthAddress::from_str(&self.contract_addresses.get(&contract_name).unwrap())
+                    .unwrap(),
+            )
+            .event("NumberIncremented(uint256)");
 
         self.caller.unsubscribe_logs(&filter)
     }
