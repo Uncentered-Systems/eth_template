@@ -34,7 +34,7 @@ anvil
 ### .env
 
 In `.env` you specify the addresses of the contracts, rpc urls, and the current chain id you want the app to work with.
-The variables are prefixed with `VITE_` so they can also be used by the UI. 
+The variables are prefixed with `VITE_` so they can also be used by the UI.
 
 After modifying `.env`, to make the changes propagate,
 
@@ -64,7 +64,7 @@ TODO - figure out why [this code](./eth_template/eth_template/src/lib.rs#L414-L4
 
 ### Foundry Wallet
 
-Set up your foundry wallet. 
+Set up your foundry wallet.
 In place of wallet-name, use `anvil`, `optimism`, `mainnet`, or `sepolia`, to insert the private key for each of these, respectively.
 These names are hardcoded into the contract `deploy.sh` script.
 When running `./deploy.sh`, you will be asked for the password you input here.
@@ -113,7 +113,7 @@ Copy the contract address from the output of the deploy script and paste it into
 
 From the UI, you can interact with the counter contract in 2 ways.
 
-#### 1. UI - BE - Chain 
+#### 1. UI - BE - Chain
 
 Send an action to the backend from the UI via WS, which will then make a call to the chain.
 
@@ -145,7 +145,7 @@ Make many increments; a convenience command for testing.
 
 `m our@eth_template:eth_template:astronaut.os '{"ManyIncrements": 5}'`
 
-#### Getting Logs Safely
+#### Getting Usdc Logs Safely
 
 To demonstrate getting a large amount of logs safely, we get logs from USDC contract on OP Mainnet.
 
@@ -165,14 +165,68 @@ In `.env`, change VITE_CURRENT_CHAIN_ID to 10 and run recompile the package.
 
 ### `eth_template`
 
+#### `Caller` struct in `caller.rs`
 
-#### Caller struct in `caller.rs`
-generalizes struct for interacting with contract.
-implements methods which are contract-agnostic, and will be used by contractcaller
+A generalized struct containing methods for interacting with the chain.
 
-#### ContractCaller struct in `contract_caller.rs`
-takes caller struct and implements specific methods for interacting with each contract.
+Used by `ContractCaller` struct.
 
-#### Getting Logs Safely Algorithm
+#### `ContractCaller` struct in `contract_caller.rs`
+
+Contains `Caller` struct.
+
+Implements methods for interacting with multiple contracts, using the primitives from the Caller struct.
+
+To interact with each contract, it imports the contract ABI using `sol!` macro from alloy.
+
+#### SubscribeIncrementLogs Example
+
+`Filter` struct is used to specify which logs to subscribe to, see `subscribe_increment_logs` in `contract_caller.rs`.
+
+Subscription updates are handled with `handle_eth_message` function.
+
+#### `Filter` Usage
+
+`Filter` is used whenever getting or subscribing to logs.
+
+Example filter from `GetUsdcLogs` action:
+
+```rust
+    let address = EthAddress::from_str(
+        &eth_caller.contract_addresses.get(&ContractName::Usdc).unwrap()
+    ).unwrap();
+
+    let filter: Filter = Filter::new()
+        .address(address)
+        .from_block(from_block)
+        .to_block(to_block)
+        .event("Transfer(address,address,uint256)")
+```
+
+`address` specifies the address of the contract from which we are fetching logs.
+
+`from_block` and `to_block` specify the desired range.
+
+`event` specifies the event type.
+TODO more detail on event and topic. Indexed etc.
+
+#### Getting Logs Safely
+
+`caller.get_logs_safely()` allows getting an arbitrary amount of logs.
+It approximates the largest amount that can be fetched at once by trial and error, and then recursively fetches logs in the requested range until the entire range has been fetched.
+
+To specify a range, use a `Filter`.
+`get_logs_safely` only supports a `Filter` which has:
+- `from_block` as BlockNumberOrTag::Number
+- `to_block` as BlockNumberOrTag::Number or BlockNumberOrTag::Latest
+
+For an example, try [Getting Usdc Logs Safely](#getting-usdc-logs-safely).
+
+An approximate benchmark demonstrated that cca 30 days of logs of all transfers on Usdc contract on Optimism Mainnet was fetched in 5.5 minutes.
 
 ### WebSocket Usage
+
+Using "Get Number" from the UI as an example.
+
+The chain of messages is as follows:
+UI -ws-> BE --> chain --> BE -ws-> UI

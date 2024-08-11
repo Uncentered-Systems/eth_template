@@ -3,6 +3,7 @@ use dotenvy::from_read;
 use lazy_static::lazy_static;
 use std::env;
 use std::io::Cursor;
+use std::time::Instant;
 
 use crate::contract_caller::COUNTER::new;
 use crate::contract_caller::{COUNTER, USDC};
@@ -316,21 +317,24 @@ fn handle_terminal_message(
                 .address(address)
                 .from_block(from_block)
                 .to_block(to_block)
-                .event("Transfer(address indexed _from,address indexed _to,uint256 _value)")
-                .topic1(keccak256("0xC8373EDFaD6d5C5f600b6b2507F78431C5271fF5".as_bytes()));
+                .event("Transfer(address,address,uint256)");
+                // .event("Transfer(address indexed _from,address indexed _to,uint256 _value)")
+                // .topic1(keccak256("0xC8373EDFaD6d5C5f600b6b2507F78431C5271fF5".as_bytes()));
 
 
 
                 // .topic1(keccak256("0xC8373EDFaD6d5C5f600b6b2507F78431C5271fF5".as_bytes()));
             // let call = COUNTER::setNumberCall { newNumber: number }.abi_encode();
             // USDC::Transfer {from:"0xC8373EDFaD6d5C5f600b6b2507F78431C5271fF5",  ..}.abi_encode();
-
+            let start = Instant::now();
             let logs = eth_caller.caller.get_logs_safely(&filter)?;
+            let duration = start.elapsed();
+            println!("Time elapsed: {:?}", duration);
 
             logs.iter().for_each(|log| {
-                println!("log: {:#?}", log);
+                // println!("log: {:#?}", log);
                 if let Ok(transfer) = log.log_decode::<USDC::Transfer>() {
-                    println!("{:#?}", transfer.inner.data);
+                    // println!("{:#?}", transfer.inner.data);
                     // let USDC::Transfer { .. } = inc.inner.data;
                 }
             });
