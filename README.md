@@ -155,6 +155,8 @@ In `.env`, change VITE_CURRENT_CHAIN_ID to 10 and run recompile the package.
 
 ## Code Explanation
 
+Follow along by looking at the code as you're reading this.
+
 ### `sol-contracts`
 
 `sol-contracts` contains all the usual foundry code for deployment, testing, etc., but also, the code for integration with the Kinode package is included.
