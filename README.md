@@ -212,11 +212,12 @@ TODO more detail on event and topic. Indexed etc.
 
 #### Getting Logs Safely
 
-`caller.get_logs_safely()` allows getting an arbitrary amount of logs.
-It approximates the largest amount that can be fetched at once by trial and error, and then recursively fetches logs in the requested range until the entire range has been fetched.
+`caller.get_logs_safely_linear()` allows getting an arbitrary amount of logs.
+It takes a chunk size, and then recursively fetches chunks of logs in the requested range until the entire range has been fetched.
+If the chunk size is too large for any subset of the block range, it will retry with a halved chunk size, thus making getting logs safe.
 
 To specify a range, use a `Filter`.
-`get_logs_safely` only supports a `Filter` which has:
+`get_logs_safely_linear` only supports a `Filter` which has:
 - `from_block` as BlockNumberOrTag::Number
 - `to_block` as BlockNumberOrTag::Number or BlockNumberOrTag::Latest
 

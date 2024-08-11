@@ -22,7 +22,7 @@ mod encryption;
 mod caller;
 use caller::Caller;
 mod contract_caller;
-use alloy_primitives::{keccak256, Signature, B256, U256};
+use alloy_primitives::{keccak256, Signature, B256, U256, FixedBytes};
 use alloy_signer::{LocalWallet, Signer};
 use contract_caller::{ContractName, ContractCaller};
 mod types;
@@ -313,28 +313,28 @@ fn handle_terminal_message(
                     .unwrap()
             )
             .unwrap();
+
+            let sender_address = EthAddress::from_str("0xC8373EDFaD6d5C5f600b6b2507F78431C5271fF5").unwrap();
+            let mut sender_topic_bytes = [0u8; 32];
+            sender_topic_bytes[12..].copy_from_slice(&sender_address.to_vec());
+            let sender_topic: FixedBytes<32> = FixedBytes::from_slice(&sender_topic_bytes);
+            
             let filter: Filter = Filter::new()
                 .address(address)
                 .from_block(from_block)
                 .to_block(to_block)
-                .event("Transfer(address,address,uint256)");
-                // .event("Transfer(address indexed _from,address indexed _to,uint256 _value)")
-                // .topic1(keccak256("0xC8373EDFaD6d5C5f600b6b2507F78431C5271fF5".as_bytes()));
+                .event("Transfer(address,address,uint256)")
+                .topic1(sender_topic);
 
-
-
-                // .topic1(keccak256("0xC8373EDFaD6d5C5f600b6b2507F78431C5271fF5".as_bytes()));
-            // let call = COUNTER::setNumberCall { newNumber: number }.abi_encode();
-            // USDC::Transfer {from:"0xC8373EDFaD6d5C5f600b6b2507F78431C5271fF5",  ..}.abi_encode();
             let start = Instant::now();
-            let logs = eth_caller.caller.get_logs_safely(&filter)?;
+            let logs = eth_caller.caller.get_logs_safely_linear(&filter, 2000)?;
             let duration = start.elapsed();
             println!("Time elapsed: {:?}", duration);
 
             logs.iter().for_each(|log| {
                 // println!("log: {:#?}", log);
                 if let Ok(transfer) = log.log_decode::<USDC::Transfer>() {
-                    // println!("{:#?}", transfer.inner.data);
+                    println!("{:#?}", transfer.inner.data);
                     // let USDC::Transfer { .. } = inc.inner.data;
                 }
             });

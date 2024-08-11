@@ -165,11 +165,87 @@ impl Caller {
         }
     }
 
+    // better performance than  get_logs_safely_binary_search
+    // goes backwards, from latest to earliest logs
+    /*
+    outside loop - stack inner loop until all desired data is received
+    inner loop - keep trying until first success. if chunk size is good, it will mostly work on the first try
+    */
+    pub fn get_logs_safely_linear(&self, filter: &Filter, chunk_size: u64) -> anyhow::Result<Vec<Log>> {
+        let latest_block = self.get_latest_block()?;
+        let starting_block: u64;
+        let ending_block: u64;
+
+        // annoying unwrapping
+        if let FilterBlockOption::Range {
+            from_block: Some(BlockNumberOrTag::Number(from_block)),
+            to_block: Some(to_block_number_or_tag),
+        } = filter.block_option
+        {
+            starting_block = from_block;
+            match to_block_number_or_tag {
+                BlockNumberOrTag::Latest => ending_block = latest_block,
+                BlockNumberOrTag::Number(to_block) => ending_block = to_block,
+                _ => return Err(anyhow::anyhow!("Please use BlockNumberOrTag::Number or BlockNumberOrTag::Latest for to_block")),
+            }
+        } else {
+            return Err(anyhow::anyhow!("Please use FilterBlockOption::Range"));
+        }
+
+        let length = chunk_size;
+        let mut chunk_filter: Filter = filter.clone();
+        chunk_filter.block_option = FilterBlockOption::Range {
+            from_block: Some(BlockNumberOrTag::Number(ending_block + 1 - length)),
+            to_block: Some(BlockNumberOrTag::Number(ending_block)),
+        };
+
+        let mut flag = true;
+        let mut logs = Vec::new();
+
+        while flag {
+            println!(
+                "ask: {:?} - {:?}",
+                chunk_filter.block_option.get_from_block(),
+                chunk_filter.block_option.get_to_block()
+            );
+
+            let (new_logs, successful_from_block, mut successful_to_block) =
+                self.get_logs_safely_inner_loop(&chunk_filter, None)?;
+            logs.splice(0..0, new_logs.into_iter()); //prepends logs
+
+            if let BlockNumberOrTag::Latest = successful_to_block {
+                successful_to_block = BlockNumberOrTag::Number(latest_block);
+            }
+            if let (
+                BlockNumberOrTag::Number(successful_from_block),
+                BlockNumberOrTag::Number(successful_to_block),
+            ) = (successful_from_block, successful_to_block)
+            {
+                println!(
+                    "got: {:?} - {:?}",
+                    successful_from_block, successful_to_block
+                );
+                if successful_from_block <= starting_block {
+                    flag = false;
+                }
+                chunk_filter.block_option = FilterBlockOption::Range {
+                    from_block: Some(BlockNumberOrTag::Number(successful_from_block - length)),
+                    to_block: Some(BlockNumberOrTag::Number(successful_from_block - 1)),
+                };
+            } else {
+                return Err(anyhow::anyhow!("Invalid inner loop output"));
+            }
+
+        }
+        Ok(logs)
+    }
+
+    // goes backwards, from latest, to earliset logs
     /*
     outside loop - stack inner loop until all desired data is received
     inner loop - keep trying until first success
      */
-    pub fn get_logs_safely(&self, filter: &Filter) -> anyhow::Result<Vec<Log>> {
+    pub fn get_logs_safely_binary_search(&self, filter: &Filter) -> anyhow::Result<Vec<Log>> {
         let latest_block = self.get_latest_block()?;
         let starting_block: u64;
 
@@ -200,7 +276,7 @@ impl Caller {
             let (new_logs, successful_from_block, mut successful_to_block) =
                 self.get_logs_safely_inner_loop(&filter, None)?;
             logs.splice(0..0, new_logs.into_iter()); //prepends logs
-            
+
             if let BlockNumberOrTag::Latest = successful_to_block {
                 successful_to_block = BlockNumberOrTag::Number(latest_block);
             }
@@ -217,6 +293,10 @@ impl Caller {
                     flag = false;
                 }
                 length = successful_to_block - successful_from_block + 1;
+                println!(
+                    "successful_to_block - successful_from_block: {:?}",
+                    successful_to_block - successful_from_block + 1
+                );
                 filter.block_option = FilterBlockOption::Range {
                     from_block: Some(BlockNumberOrTag::Number(successful_from_block - length)),
                     to_block: Some(BlockNumberOrTag::Number(successful_from_block - 1)),
