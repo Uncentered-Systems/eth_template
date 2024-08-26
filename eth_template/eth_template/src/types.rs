@@ -27,7 +27,8 @@ pub enum Action {
     ManyIncrements(u64),
     SubscribeIncrementLogs,
     UnsubscribeIncrementLogs,
-    GetUsdcLogs{from_block: u64, to_block: u64}// from_block, to_block
+    GetUsdcLogs{from_block: u64, to_block: u64}, // from_block, to_block
+    Decrement,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

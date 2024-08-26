@@ -5,11 +5,12 @@ import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.s
 import "openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 
-
-contract Counter is Initializable, OwnableUpgradeable, UUPSUpgradeable {
+/// @custom:oz-upgrades-from Counter
+contract CounterV2  is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     uint256 public number;
 
     event NumberIncremented(uint256 newNumber);
+    event NumberDecremented(uint256 newNumber);
     event NumberSet(uint256 newNumber);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -22,7 +23,6 @@ contract Counter is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     function initialize(address initialOwner) initializer public {
         __Ownable_init(initialOwner);
         __UUPSUpgradeable_init();
-        number = 0;
     }
 
     function _authorizeUpgrade(address newImplementation)
@@ -30,7 +30,6 @@ contract Counter is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         onlyOwner
         override
     {}
-
 
     function setNumber(uint256 newNumber) public {
         number = newNumber;
@@ -40,5 +39,10 @@ contract Counter is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     function increment() public {
         number++;
         emit NumberIncremented(number);
+    }
+
+    function decrement() public {
+        number--;
+        emit NumberDecremented(number);
     }
 }

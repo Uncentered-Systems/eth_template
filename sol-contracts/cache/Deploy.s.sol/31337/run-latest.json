@@ -2,6 +2,12 @@
   "transactions": [
     {
       "rpc": "ws://localhost:8545"
+    },
+    {
+      "rpc": "ws://localhost:8545"
+    },
+    {
+      "rpc": "ws://localhost:8545"
     }
   ]
 }

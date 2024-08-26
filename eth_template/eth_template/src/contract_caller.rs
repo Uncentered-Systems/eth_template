@@ -24,7 +24,7 @@ sol!(
     #[sol(rpc)]
     #[derive(Debug, Deserialize, Serialize)]
     COUNTER,
-    "abi/Counter.json"
+    "abi/CounterV2.json"
 );
 
 #[derive(Eq, Hash, PartialEq)]
@@ -103,6 +103,34 @@ impl ContractCaller {
             }
         }
     }
+
+    // only exists in CounterV2
+    pub fn decrement(&self) -> anyhow::Result<(FixedBytes<32>, u64)> {
+        let call = COUNTER::decrementCall {}.abi_encode();
+        println!("decrementing");
+        match self.caller.send_tx(
+            call,
+            &self
+                .contract_addresses
+                .get(&ContractName::Counter)
+                .unwrap_or(&"".to_string()),
+            1500000,
+            10000000000,
+            300000000,
+            U256::from(0),
+            *CURRENT_CHAIN_ID,
+        ) {
+            Ok((tx_hash, nonce)) => {
+                println!("tx_hash: {:?}", tx_hash);
+                Ok((tx_hash, nonce))
+            }
+            Err(e) => {
+                println!("Error decrementing counter: {:?}", e);
+                Err(anyhow::anyhow!("Error decrementing counter: {:?}", e))
+            }
+        }
+    }
+
 
     pub fn number(&self) -> anyhow::Result<U256> {
         let call: Vec<u8> = COUNTER::numberCall {}.abi_encode();

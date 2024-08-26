@@ -169,6 +169,7 @@ fn handle_terminal_message(
 ) -> anyhow::Result<()> {
     println!("terminal message received");
 
+    println!("decremento");
     let action = match serde_json::from_slice::<Action>(&message.body()) {
         Ok(deserialized) => deserialized,
         Err(e) => {
@@ -264,6 +265,15 @@ fn handle_terminal_message(
                 let result = eth_caller.increment_with_nonce(nonce + 1)?;
                 nonce = result.1;
             }
+        }
+        Action::Decrement => {
+            if let None = eth_caller {
+                println!("eth caller not instantied. please decrypt wallet first.");
+                return Ok(());
+            }
+            let eth_caller = eth_caller.as_ref().unwrap();
+            let result = eth_caller.decrement()?;
+            println!("decrement result: {:#?}", result);
         }
         Action::GetIncrementLogs(from_block) => {
             if let None = eth_caller {
