@@ -1,7 +1,13 @@
 {
   "transactions": [
     {
-      "rpc": "ws://localhost:8545"
+      "rpc": "https://sepolia.infura.io/v3/ce8167f5e4864cfd9f70e36c088bab16"
+    },
+    {
+      "rpc": "https://sepolia.infura.io/v3/ce8167f5e4864cfd9f70e36c088bab16"
+    },
+    {
+      "rpc": "https://sepolia.infura.io/v3/ce8167f5e4864cfd9f70e36c088bab16"
     }
   ]
 }

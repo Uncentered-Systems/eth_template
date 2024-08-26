@@ -2,13 +2,26 @@
 
 ## Dev Setup
 
+You will have a setup with an implementation contract and a proxy contract.
+Proxy contract is called and delegates function calls to implementation contract.
+This allows the implementation contract to be easily upgraded.
+
 [Install foundry.](https://book.getfoundry.sh/getting-started/installation)
 
-Build contract and copy the abi so that Rust and JS can read it.
+Install Open Zeppelin deps used for upgradable contracts.
 
 ```bash
 cd sol-contracts
-./build.sh
+forge install foundry-rs/forge-std
+forge install OpenZeppelin/openzeppelin-foundry-upgrades
+forge install OpenZeppelin/openzeppelin-contracts-upgradeable
+```
+
+Build contracts (original and upgraded versions) and copy the abi-s so that Rust and JS can read them.
+
+```bash
+cd sol-contracts
+sh build.sh
 ```
 
 Install eth_template package on your node.
@@ -66,8 +79,8 @@ TODO - figure out why [this code](./eth_template/eth_template/src/lib.rs#L414-L4
 
 Set up your foundry wallet.
 In place of wallet-name, use `anvil`, `optimism`, `mainnet`, or `sepolia`, to insert the private key for each of these, respectively.
-These names are hardcoded into the contract `deploy.sh` script.
-When running `./deploy.sh`, you will be asked for the password you input here.
+These names are hardcoded into `script.sh`, which is used for running Solidity scripts.
+When running `sh script.sh`, you will be asked for the password you input here.
 
 ```bash
 cast wallet import <wallet-name> --interactive
@@ -103,10 +116,15 @@ In that case, do the following:
 ## Counter Contract
 
 Specify the current chain id and its rpc url in the `.env` file.
-Then:
-`./deploy.sh`
 
-Copy the contract address from the output of the deploy script and paste it into the VITE_ANVIL_CONTRACT_ADDRESS field in the `.env` file.
+Before running a script, run `forge clean` as part of the workflow.
+Specify which script you want to run as the first argument in `script.sh`.
+```bash
+forge clean
+sh script.sh Deploy.s.sol 
+```
+
+Find proxy address from the output of the deploy script and paste it into the VITE_ANVIL_CONTRACT_ADDRESS field in the `.env` file.
 [Recompile the process and restart the server.](#env)
 
 ### Interacting with Counter Contract
@@ -153,6 +171,48 @@ In `.env`, change VITE_CURRENT_CHAIN_ID to 10 and run recompile the package.
 
 `m our@eth_template:eth_template:astronaut.os '{"GetUsdcLogs": {"from_block": 123865000, "to_block": 123865806}}'`
 
+## Upgrade Contract
+
+Try running the following in node terminal.
+
+```bash
+m our eth_template:eth_template:astronaut.os "Decrement"
+```
+
+It shouldn't work, since `decrement()` is not implemented in the initial version of the Counter contract.
+You should be able to verify that it is not working correctly by checking the counter value in the UI.
+
+The following steps will show you how to upgrade the contract which will enable the usage of `decrement()` function.
+
+Assuming you ran `sh build.sh` which copied the abi of the upgraded contract into the crate, you can modify the `sol!` macro in `contract_caller.rs` to use the "abi/CounterV2.json" instead of "abi/Counter.json".
+
+```rust
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    #[derive(Debug, Deserialize, Serialize)]
+    COUNTER,
+    "abi/CounterV2.json"
+);
+```
+
+Next, run the upgrade script.
+
+```bash
+forge clean
+sh script.sh UpgradeToV2.s.sol 
+```
+
+This upgrades the contract, adding a `decrement()` function.
+The app will still call the same proxy address as before, which will delegate the call to new version of implementation contract.
+
+Now run the following in node terminal:
+```bash
+m our eth_template:eth_template:astronaut.os "Decrement"
+```
+
+You should be able to verify that it works correctly by checking the counter value in the UI.
+
 ## Code Explanation
 
 Follow along by looking at the code as you're reading this.
@@ -161,9 +221,12 @@ Follow along by looking at the code as you're reading this.
 
 `sol-contracts` contains all the usual foundry code for deployment, testing, etc., but also, the code for integration with the Kinode package is included.
 
-`build.sh` copies the abi into the ui and into the rust backend, which they both use to interact with the contract.
+`build.sh` copies the abi-s of specified contracts into the ui and into the rust backend, which they both use to interact with the contract.
 
-`deploy.sh` is the script that will deploy the contract to the chain specified in .env.
+`script.sh` is the script which is used to run the `Deploy.s.sol` and `UpgradeToV2.s.sol` scripts.
+
+`Deploy.s.sol` deploys the contract to the chain specified in .env.
+`UpgradeToV2.s.sol` upgrades the contract to the upgraded version.
 
 ### `eth_template`
 

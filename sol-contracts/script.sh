@@ -46,11 +46,11 @@ case $VITE_CURRENT_CHAIN_ID in
 esac
 
 read -s -p "Enter keystore password: " password
-our_address=$(sshpass -p "$password" cast wallet address --account anvil --password $password)
+our_address=$(sshpass -p "$password" cast wallet address --account $account --password $password)
 
 case $script_name in
     "Deploy.s.sol")
-        sshpass -p "$password" forge script --rpc-url $rpc_url script/$script_name --broadcast --account $account --sender $our_address
+        sshpass -p "$password" forge script --rpc-url $rpc_url script/$script_name --broadcast --account $account --sender $our_address #--verify --verifier-url "https://api-sepolia.etherscan.io/api" --etherscan-api-key "PKNIX2CRNYFCZZHQK1CQTCUTUW59ED4GWQ" --resume
         ;;
     "UpgradeToV2.s.sol")
         sshpass -p "$password" forge script --rpc-url $rpc_url script/$script_name --broadcast --account $account --sender $our_address --sig "run(address)" $proxy_address
